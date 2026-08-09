@@ -20,6 +20,7 @@ function renderControls(overrides: Partial<React.ComponentProps<typeof ComposerC
       <ComposerControls
         busy={false}
         busyAction="stop"
+        canSteer={false}
         canSubmit={true}
         conversation={{
           active: false,
@@ -35,6 +36,7 @@ function renderControls(overrides: Partial<React.ComponentProps<typeof ComposerC
         hasComposerPayload={true}
         onDictate={vi.fn()}
         onQueue={vi.fn()}
+        onSteer={vi.fn()}
         state={state}
         voiceStatus="idle"
         {...overrides}
@@ -63,16 +65,22 @@ describe('ComposerControls shortcut tooltips', () => {
     await expectShortcutTooltip('Send', '↵')
   })
 
-  it('shows Enter for Steer', async () => {
-    renderControls({ busy: true, busyAction: 'steer' })
-
-    await expectShortcutTooltip('Steer the current run', '↵')
-  })
-
-  it('shows Ctrl+Enter for Queue', async () => {
+  it('shows Enter for Queue', async () => {
     renderControls({ busy: true, busyAction: 'queue' })
 
-    await expectShortcutTooltip('Queue message', 'Ctrl+↵')
+    await expectShortcutTooltip('Queue message', '↵')
+  })
+
+  it('shows Ctrl+Enter for the explicit Steer action', async () => {
+    renderControls({ busy: true, busyAction: 'queue', canSteer: true })
+
+    await expectShortcutTooltip('Steer the current run', 'Ctrl+↵')
+  })
+
+  it('does not show a redundant queue control beside the queue primary action', () => {
+    renderControls({ busy: true, busyAction: 'queue' })
+
+    expect(screen.queryByRole('button', { name: 'Steer the current run' })).toBeNull()
   })
 })
 

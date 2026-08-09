@@ -211,6 +211,10 @@ export function ComposerStatusStack({ queue, sessionId }: ComposerStatusStackPro
   // status card, above the billing wall, above everything. They're the only
   // rows up here you press instead of read, so nothing may ever stack on top
   // of them. Rendered outside the card (below) so the pills float.
+  // A lone queued prompt is an acknowledgement, not a status dashboard. Keep
+  // it as a compact tray above the composer; background work and goals still
+  // use the full-width stack where their rows benefit from the space.
+  const queueOnly = sections.length === 1 && sections[0]?.key === 'queue'
   const visible = sections.length > 0
 
   // No height to publish: the stack is an in-flow child of the composer dock,
@@ -241,7 +245,9 @@ export function ComposerStatusStack({ queue, sessionId }: ComposerStatusStackPro
             composerDockCard('top'),
             // Inset (mx-2) so the stack reads slightly narrower than the composer
             // surface below it — the original look.
-            'mx-2 overflow-hidden rounded-b-none border-b border-b-transparent pt-0.5',
+            queueOnly
+              ? 'mb-1.5 ml-2 w-fit max-w-[min(24rem,calc(100%-1rem))] self-start rounded-[var(--radius-xl)] border-b border-border/65 pt-0.5'
+              : 'mx-2 overflow-hidden rounded-b-none border-b border-b-transparent pt-0.5',
             'transition-opacity duration-200 ease-out',
             scrolledUp ? 'opacity-30 group-hover/composer:opacity-100' : 'opacity-100'
           )}

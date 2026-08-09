@@ -72,7 +72,7 @@ describe('useComposerSubmit busy-turn routing', () => {
     vi.restoreAllMocks()
   })
 
-  it('steers a plain-text follow-up instead of queueing or stopping', async () => {
+  it('queues a plain-text follow-up instead of steering or stopping', () => {
     const { hook, onCancel, onSteer, onSubmit, queueCurrentDraft } = renderSubmitHook({
       busy: true,
       text: 'change course'
@@ -82,8 +82,8 @@ describe('useComposerSubmit busy-turn routing', () => {
       hook.result.current.submitDraft()
     })
 
-    await waitFor(() => expect(onSteer).toHaveBeenCalledWith('change course'))
-    expect(queueCurrentDraft).not.toHaveBeenCalled()
+    expect(queueCurrentDraft).toHaveBeenCalledTimes(1)
+    expect(onSteer).not.toHaveBeenCalled()
     expect(onCancel).not.toHaveBeenCalled()
     expect(onSubmit).not.toHaveBeenCalled()
   })
@@ -101,6 +101,22 @@ describe('useComposerSubmit busy-turn routing', () => {
 
     expect(queueCurrentDraft).toHaveBeenCalledTimes(1)
     expect(onSteer).not.toHaveBeenCalled()
+    expect(onSubmit).not.toHaveBeenCalled()
+    expect(onCancel).not.toHaveBeenCalled()
+  })
+
+  it('steers only through the explicit steer action', async () => {
+    const { hook, onCancel, onSteer, onSubmit, queueCurrentDraft } = renderSubmitHook({
+      busy: true,
+      text: 'change course'
+    })
+
+    act(() => {
+      hook.result.current.steerDraft()
+    })
+
+    await waitFor(() => expect(onSteer).toHaveBeenCalledWith('change course'))
+    expect(queueCurrentDraft).not.toHaveBeenCalled()
     expect(onSubmit).not.toHaveBeenCalled()
     expect(onCancel).not.toHaveBeenCalled()
   })
@@ -225,15 +241,16 @@ describe('useComposerSubmit with a clarify parked on the session', () => {
     expect($clarifyRequests.get()['runtime-session']).toBeUndefined()
   })
 
-  it('skips the question before steering a busy turn', async () => {
+  it('skips the question before queueing a busy turn', () => {
     parkClarify('runtime-session')
-    const { hook, onSteer } = renderSubmitHook({ busy: true, text: 'change course' })
+    const { hook, onSteer, queueCurrentDraft } = renderSubmitHook({ busy: true, text: 'change course' })
 
     act(() => {
       hook.result.current.submitDraft()
     })
 
-    await waitFor(() => expect(onSteer).toHaveBeenCalledWith('change course'))
+    expect(queueCurrentDraft).toHaveBeenCalledTimes(1)
+    expect(onSteer).not.toHaveBeenCalled()
     expect(gatewayRequest).toHaveBeenCalledWith('clarify.respond', { request_id: 'req-runtime-session', answer: '' })
   })
 

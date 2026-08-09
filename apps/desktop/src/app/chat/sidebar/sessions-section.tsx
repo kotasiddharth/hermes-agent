@@ -104,6 +104,8 @@ interface SidebarSessionsSectionProps {
   emptyState: React.ReactNode
   forceEmptyState?: boolean
   headerAction?: React.ReactNode
+  /** Suppress a redundant section title while preserving the list itself. */
+  hideHeader?: boolean
   footer?: React.ReactNode
   groups?: SidebarSessionGroup[]
   tree?: SidebarWorkspaceTree[]
@@ -175,6 +177,7 @@ export function SidebarSessionsSection({
   emptyState,
   forceEmptyState = false,
   headerAction,
+  hideHeader = false,
   footer,
   groups,
   projectOverview,
@@ -446,15 +449,17 @@ export function SidebarSessionsSection({
 
   return (
     <SidebarGroup className={rootClassName}>
-      <SidebarSectionHeader
-        action={headerAction}
-        collapsible={collapsible}
-        icon={labelIcon}
-        label={label}
-        meta={labelMeta}
-        onToggle={onToggle}
-        open={sectionOpen}
-      />
+      {!hideHeader && (
+        <SidebarSectionHeader
+          action={headerAction}
+          collapsible={collapsible}
+          icon={labelIcon}
+          label={label}
+          meta={labelMeta}
+          onToggle={onToggle}
+          open={sectionOpen}
+        />
+      )}
       {sectionOpen && (
         <SidebarGroupContent className={resolvedContentClassName}>
           {inner}

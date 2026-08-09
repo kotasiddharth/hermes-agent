@@ -10,7 +10,7 @@ import { Tip, TipKeybindLabel } from '@/components/ui/tooltip'
 import { useI18n } from '@/i18n'
 import { triggerHaptic } from '@/lib/haptics'
 import { cn } from '@/lib/utils'
-import { $fileBrowserOpen, toggleFileBrowserOpen } from '@/store/layout'
+import { $fileBrowserOpen, $sidebarOpen, toggleFileBrowserOpen, toggleSidebarOpen } from '@/store/layout'
 
 import { appViewForPath, isOverlayView } from '../routes'
 
@@ -93,10 +93,23 @@ export function TitlebarControls({ leftTools = [], tools = [], onOpenSettings }:
   const location = useLocation()
   const modHeld = useModifierHeld()
   const fileBrowserOpen = useStore($fileBrowserOpen)
+  const sidebarOpen = useStore($sidebarOpen)
 
+  const leftEdge = { open: sidebarOpen, toggle: toggleSidebarOpen }
   // This control shows or hides the physical right edge of the main zone, so
   // it stays correct through layout flips and rearranges.
   const rightEdge = { open: fileBrowserOpen, toggle: toggleFileBrowserOpen }
+
+  const sidebarTool: TitlebarTool = {
+    actionId: 'view.toggleSidebar',
+    icon: <Codicon name="layout-sidebar-left" />,
+    id: 'sidebar',
+    label: leftEdge.open ? t.titlebar.hideSidebar : t.titlebar.showSidebar,
+    onSelect: () => {
+      triggerHaptic('tap')
+      leftEdge.toggle()
+    }
+  }
 
   const rightSidebarTool: TitlebarTool = {
     actionId: 'view.toggleRightSidebar',
@@ -153,7 +166,7 @@ export function TitlebarControls({ leftTools = [], tools = [], onOpenSettings }:
 
   const visibleSystemTools = systemTools.filter(tool => !tool.hidden)
   const visiblePaneTools = tools.filter(tool => !tool.hidden)
-  const visibleLeftTools = leftTools.filter(tool => !tool.hidden)
+  const visibleLeftTools = [sidebarTool, ...leftTools].filter(tool => !tool.hidden)
 
   return (
     <>

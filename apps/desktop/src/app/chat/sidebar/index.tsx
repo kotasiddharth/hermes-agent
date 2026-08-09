@@ -11,7 +11,6 @@ import { Codicon } from '@/components/ui/codicon'
 import { ContextMenu, ContextMenuContent, ContextMenuTrigger } from '@/components/ui/context-menu'
 import { GlyphSpinner } from '@/components/ui/glyph-spinner'
 import { KbdGroup } from '@/components/ui/kbd'
-import { SearchField } from '@/components/ui/search-field'
 import {
   Sidebar,
   SidebarContent,
@@ -23,11 +22,10 @@ import {
 } from '@/components/ui/sidebar'
 import { Tip, TipKeybindLabel } from '@/components/ui/tooltip'
 import { useContributions } from '@/contrib/react/use-contributions'
-import { searchSessions, type SessionInfo, type SessionSearchResult } from '@/hermes'
+import { type SessionInfo } from '@/hermes'
 import { useI18n } from '@/i18n'
 import { comboTokens } from '@/lib/keybinds/combo'
 import { profileColor } from '@/lib/profile-color'
-import { sessionMatchesSearch } from '@/lib/session-search'
 import { normalizeSessionSource, sessionSourceLabel } from '@/lib/session-source'
 import { cn } from '@/lib/utils'
 import { $cronJobs } from '@/store/cron'
@@ -48,7 +46,6 @@ import {
   $sidebarWorkspaceParentOrderIds,
   filterVisibleProjects,
   pinSession,
-  SESSION_SEARCH_FOCUS_EVENT,
   setPinnedSessionOrder,
   setSidebarAgentsGrouped,
   setSidebarCronOpen,
@@ -200,29 +197,6 @@ const HEADER_NAV_BTN =
 // FTS results cover sessions that aren't in the loaded page; synthesize a
 // minimal SessionInfo so they render in the same row component (resume works
 // by id; the snippet stands in for the preview).
-function searchResultToSession(result: SessionSearchResult): SessionInfo {
-  const ts = result.session_started ?? Date.now() / 1000
-
-  return {
-    archived: false,
-    cwd: null,
-    ended_at: null,
-    id: result.session_id,
-    _lineage_root_id: result.lineage_root ?? null,
-    input_tokens: 0,
-    is_active: false,
-    last_active: ts,
-    message_count: 0,
-    model: result.model ?? null,
-    output_tokens: 0,
-    preview: result.snippet?.trim() || null,
-    source: result.source ?? null,
-    started_at: ts,
-    title: null,
-    tool_call_count: 0
-  }
-}
-
 interface ChatSidebarProps extends React.ComponentProps<typeof Sidebar> {
   currentView: AppView
   onNavigate: (item: SidebarNavItem) => void
@@ -321,9 +295,6 @@ export function ChatSidebar({
   const dismissedAutoProjects = useStore($dismissedAutoProjectIds)
   const newSessionCombo = useStore($bindings)['session.new']?.[0]
   const newSessionKbd = newSessionCombo ? comboTokens(newSessionCombo) : []
-  const [searchQuery, setSearchQuery] = useState('')
-  const [serverMatches, setServerMatches] = useState<SessionSearchResult[]>([])
-  const [searchPending, setSearchPending] = useState(false)
   const [newSessionKbdFlash, setNewSessionKbdFlash] = useState(false)
   const [profileLoadMorePending, setProfileLoadMorePending] = useState<Record<string, boolean>>({})
   const [messagingLoadMorePending, setMessagingLoadMorePending] = useState<Record<string, boolean>>({})
@@ -331,18 +302,6 @@ export function ChatSidebar({
   const messagingOpenIds = useStore($sidebarMessagingOpenIds)
   // Per-platform count of rows currently revealed (starts at NON_SESSION_INITIAL_ROWS).
   const [messagingVisible, setMessagingVisible] = useState<Record<string, number>>({})
-  const searchInputRef = useRef<HTMLInputElement>(null)
-  const trimmedQuery = searchQuery.trim()
-
-  // Hotkey (session.focusSearch) → focus the field once it's mounted.
-  useEffect(() => {
-    const onFocus = () => searchInputRef.current?.focus({ preventScroll: true })
-
-    window.addEventListener(SESSION_SEARCH_FOCUS_EVENT, onFocus)
-
-    return () => window.removeEventListener(SESSION_SEARCH_FOCUS_EVENT, onFocus)
-  }, [])
-
   // Flash the ⌘N hint full-opacity (no transition) for the press, so hitting
   // the shortcut visibly pings its affordance in the sidebar.
   useEffect(() => {
@@ -435,67 +394,6 @@ export function ChatSidebar({
       (session._lineage_root_id != null && pinnedIdentitySet.has(session._lineage_root_id)),
     [pinnedIdentitySet]
   )
-
-  // Full-text search across *all* sessions (not just the loaded page) so 699
-  // sessions stay findable. Debounced; loaded sessions are matched instantly
-  // client-side and merged ahead of the server hits.
-  useEffect(() => {
-    if (!trimmedQuery) {
-      setServerMatches([])
-      setSearchPending(false)
-
-      return
-    }
-
-    let cancelled = false
-
-    setSearchPending(true)
-
-    const id = window.setTimeout(() => {
-      void searchSessions(trimmedQuery)
-        .then(res => {
-          if (!cancelled) {
-            setServerMatches(res.results)
-          }
-        })
-        .catch(() => undefined)
-        .finally(() => {
-          if (!cancelled) {
-            setSearchPending(false)
-          }
-        })
-    }, 200)
-
-    return () => {
-      cancelled = true
-      window.clearTimeout(id)
-    }
-  }, [trimmedQuery])
-
-  const searchResults = useMemo(() => {
-    if (!trimmedQuery) {
-      return []
-    }
-
-    const out = new Map<string, SessionInfo>()
-
-    for (const s of sortedSessions) {
-      if (sessionMatchesSearch(s, trimmedQuery)) {
-        out.set(s.id, s)
-      }
-    }
-
-    for (const match of serverMatches) {
-      if (out.has(match.session_id)) {
-        continue
-      }
-
-      const loaded = sessionByAnyId.get(match.session_id)
-      out.set(match.session_id, loaded ?? searchResultToSession(match))
-    }
-
-    return [...out.values()]
-  }, [trimmedQuery, sortedSessions, serverMatches, sessionByAnyId])
 
   const unpinnedAgentSessions = useMemo(
     () => sortedSessions.filter(s => !isPinnedSession(s)),
@@ -1222,48 +1120,8 @@ export function ChatSidebar({
         </SidebarGroup>
 
         {showSessionSections && (
-          <div className="shrink-0 px-2 pb-1 pt-1">
-            <SearchField
-              aria-label={s.searchAria}
-              inputRef={searchInputRef}
-              onChange={setSearchQuery}
-              placeholder={s.searchPlaceholder}
-              value={searchQuery}
-            />
-          </div>
-        )}
-
-        {showSessionSections && (
           <div className={cn('flex min-h-0 flex-1 flex-col pb-1.75', SCROLL_Y)}>
-            {trimmedQuery && (
-              <SidebarSessionsSection
-                activeSessionId={activeSidebarSessionId}
-                contentClassName={cn('flex min-h-0 flex-1 flex-col gap-px pb-1.75', SCROLL_Y)}
-                emptyState={
-                  searchPending ? (
-                    <SidebarSessionSkeletons />
-                  ) : (
-                    <div className="wrap-anywhere grid min-h-24 place-items-center rounded-lg px-2 text-center text-xs text-(--ui-text-tertiary)">
-                      {s.noMatch(trimmedQuery)}
-                    </div>
-                  )
-                }
-                label={s.results}
-                onArchiveSession={onArchiveSession}
-                onBranchSession={onBranchSession}
-                onDeleteSession={onDeleteSession}
-                onResumeSession={onResumeSession}
-                onToggle={() => undefined}
-                onTogglePin={pinSession}
-                open
-                pinned={false}
-                rootClassName="min-h-32 flex-1 overflow-hidden p-0"
-                sessions={searchResults}
-                workingSessionIdSet={workingSessionIdSet}
-              />
-            )}
-
-            {!trimmedQuery && pinnedSessions.length > 0 && (
+            {pinnedSessions.length > 0 && (
               <SidebarSessionsSection
                 activeSessionId={activeSidebarSessionId}
                 contentClassName="flex flex-col gap-px rounded-lg pb-2 pt-1"
@@ -1286,170 +1144,168 @@ export function ChatSidebar({
               />
             )}
 
-            {!trimmedQuery && (
-              <SidebarSessionsSection
-                activeProjectId={activeProjectId}
-                activeSessionId={activeSidebarSessionId}
-                collapsible={!inProject}
-                contentClassName={cn(
-                  'sidebar-history-scroll flex min-h-0 flex-1 flex-col pb-1.75',
-                  SCROLL_Y,
-                  // Separate profile sections clearly in the ALL view; rows inside
-                  // each group keep their own tight gap-px rhythm.
-                  showAllProfiles ? 'gap-3' : 'gap-px',
-                  // Flatten into the single scroll when compact — unless this is the
-                  // virtualized long list, which must keep its own scroller.
-                  !recentsVirtualizes && COMPACT_FLAT
-                )}
-                dateGrouped
-                dndSensors={dndSensors}
-                emptyState={
-                  showSessionSkeletons ? (
-                    <SidebarSessionSkeletons />
-                  ) : (
-                    <div className="grid min-h-16 place-items-center rounded-lg px-2 text-center text-xs text-(--ui-text-tertiary)">
-                      {inProject ? s.projectEmpty : pinnedSessions.length > 0 ? s.allPinned : s.noSessions}
+            <SidebarSessionsSection
+              activeProjectId={activeProjectId}
+              activeSessionId={activeSidebarSessionId}
+              collapsible={!inProject}
+              contentClassName={cn(
+                'sidebar-history-scroll flex min-h-0 flex-1 flex-col pb-1.75',
+                SCROLL_Y,
+                // Separate profile sections clearly in the ALL view; rows inside
+                // each group keep their own tight gap-px rhythm.
+                showAllProfiles ? 'gap-3' : 'gap-px',
+                // Flatten into the single scroll when compact — unless this is the
+                // virtualized long list, which must keep its own scroller.
+                !recentsVirtualizes && COMPACT_FLAT
+              )}
+              dateGrouped
+              dndSensors={dndSensors}
+              emptyState={
+                showSessionSkeletons ? (
+                  <SidebarSessionSkeletons />
+                ) : (
+                  <div className="grid min-h-16 place-items-center rounded-lg px-2 text-center text-xs text-(--ui-text-tertiary)">
+                    {inProject ? s.projectEmpty : pinnedSessions.length > 0 ? s.allPinned : s.noSessions}
+                  </div>
+                )
+              }
+              footer={
+                // Hide "load more" only when workspace-grouped (those groups page
+                // themselves). ALL-profiles now pages per-profile from each profile
+                // header; the global footer only applies to non-ALL views.
+                !showAllProfiles && !agentsGrouped && !showSessionSkeletons && hasMoreSessions ? (
+                  <SidebarLoadMoreRow
+                    loading={sessionsLoading || recentsLoadMorePending}
+                    onClick={() => void onLoadMoreRecents()}
+                    // Recents are post-filtered to non-project sessions, so a
+                    // backend page size (50) is not a truthful "rows you'll
+                    // see" count. Use the generic label instead of a fake N.
+                    step={0}
+                  />
+                ) : null
+              }
+              forceEmptyState={showSessionSkeletons}
+              groups={displayAgentGroups}
+              headerAction={
+                inProject && enteredProject ? (
+                  <div className="group/workspace flex shrink-0 items-center gap-0.5">
+                    {enteredProject.path && <StartWorkButton repoPath={enteredProject.path} />}
+                    {/* Home has no folder and no record to rename, theme, or delete. */}
+                    {!enteredProject.isNoProject && (
+                      <ProjectMenu
+                        isActive={enteredProject.id === activeProjectId}
+                        onExitScope={exitProjectScope}
+                        project={enteredProject}
+                        scoped
+                      />
+                    )}
+                    <div className="grid size-6 place-items-center">
+                      <Tip label={s.showProjects}>
+                        <Button
+                          aria-label={s.showProjects}
+                          className={HEADER_NAV_BTN}
+                          onClick={event => {
+                            event.stopPropagation()
+                            exitProjectScope()
+                          }}
+                          size="icon-xs"
+                          variant="ghost"
+                        >
+                          <Codicon name="list-unordered" size="0.75rem" />
+                        </Button>
+                      </Tip>
                     </div>
-                  )
-                }
-                footer={
-                  // Hide "load more" only when workspace-grouped (those groups page
-                  // themselves). ALL-profiles now pages per-profile from each profile
-                  // header; the global footer only applies to non-ALL views.
-                  !showAllProfiles && !agentsGrouped && !showSessionSkeletons && hasMoreSessions ? (
-                    <SidebarLoadMoreRow
-                      loading={sessionsLoading || recentsLoadMorePending}
-                      onClick={() => void onLoadMoreRecents()}
-                      // Recents are post-filtered to non-project sessions, so a
-                      // backend page size (50) is not a truthful "rows you'll
-                      // see" count. Use the generic label instead of a fake N.
-                      step={0}
-                    />
-                  ) : null
-                }
-                forceEmptyState={showSessionSkeletons}
-                groups={displayAgentGroups}
-                headerAction={
-                  inProject && enteredProject ? (
-                    <div className="group/workspace flex shrink-0 items-center gap-0.5">
-                      {enteredProject.path && <StartWorkButton repoPath={enteredProject.path} />}
-                      {/* Home has no folder and no record to rename, theme, or delete. */}
-                      {!enteredProject.isNoProject && (
-                        <ProjectMenu
-                          isActive={enteredProject.id === activeProjectId}
-                          onExitScope={exitProjectScope}
-                          project={enteredProject}
-                          scoped
-                        />
-                      )}
-                      <div className="grid size-6 place-items-center">
-                        <Tip label={s.showProjects}>
-                          <Button
-                            aria-label={s.showProjects}
-                            className={HEADER_NAV_BTN}
-                            onClick={event => {
-                              event.stopPropagation()
-                              exitProjectScope()
-                            }}
-                            size="icon-xs"
-                            variant="ghost"
-                          >
-                            <Codicon name="list-unordered" size="0.75rem" />
-                          </Button>
-                        </Tip>
-                      </div>
-                    </div>
-                  ) : (
-                    <div className="flex shrink-0 items-center gap-0.5">
-                      {!showAllProfiles ? (
-                        <Tip label={agentsGrouped ? s.projects.newButton : s.nav['new-session']}>
-                          <Button
-                            aria-label={agentsGrouped ? s.projects.newButton : s.nav['new-session']}
-                            className={HEADER_ACTION_BTN}
-                            onClick={event => {
-                              event.stopPropagation()
+                  </div>
+                ) : (
+                  <div className="flex shrink-0 items-center gap-0.5">
+                    {!showAllProfiles ? (
+                      <Tip label={agentsGrouped ? s.projects.newButton : s.nav['new-session']}>
+                        <Button
+                          aria-label={agentsGrouped ? s.projects.newButton : s.nav['new-session']}
+                          className={HEADER_ACTION_BTN}
+                          onClick={event => {
+                            event.stopPropagation()
 
-                              if (agentsGrouped) {
-                                openProjectCreate()
-                              } else {
-                                onNewSessionInWorkspace(null)
-                              }
+                            if (agentsGrouped) {
+                              openProjectCreate()
+                            } else {
+                              onNewSessionInWorkspace(null)
+                            }
+                          }}
+                          size="icon-xs"
+                          variant="ghost"
+                        >
+                          <Codicon name="add" size="0.75rem" />
+                        </Button>
+                      </Tip>
+                    ) : null}
+                    <div className="grid size-6 place-items-center">
+                      {!showAllProfiles && agentSessions.length > 0 ? (
+                        <Tip label={agentsGrouped ? s.showSessions : s.showProjects}>
+                          <Button
+                            aria-label={agentsGrouped ? s.showSessions : s.showProjects}
+                            className={cn(
+                              HEADER_NAV_BTN,
+                              agentsGrouped && 'bg-(--ui-control-active-background) text-foreground opacity-100'
+                            )}
+                            onClick={event => {
+                              event.stopPropagation()
+                              setSidebarRecentsOpen(true)
+                              setSidebarAgentsGrouped(!agentsGrouped)
                             }}
                             size="icon-xs"
                             variant="ghost"
                           >
-                            <Codicon name="add" size="0.75rem" />
+                            <Codicon name={agentsGrouped ? 'list-unordered' : 'root-folder'} size="0.75rem" />
                           </Button>
                         </Tip>
                       ) : null}
-                      <div className="grid size-6 place-items-center">
-                        {!showAllProfiles && agentSessions.length > 0 ? (
-                          <Tip label={agentsGrouped ? s.showSessions : s.showProjects}>
-                            <Button
-                              aria-label={agentsGrouped ? s.showSessions : s.showProjects}
-                              className={cn(
-                                HEADER_NAV_BTN,
-                                agentsGrouped && 'bg-(--ui-control-active-background) text-foreground opacity-100'
-                              )}
-                              onClick={event => {
-                                event.stopPropagation()
-                                setSidebarRecentsOpen(true)
-                                setSidebarAgentsGrouped(!agentsGrouped)
-                              }}
-                              size="icon-xs"
-                              variant="ghost"
-                            >
-                              <Codicon name={agentsGrouped ? 'list-unordered' : 'root-folder'} size="0.75rem" />
-                            </Button>
-                          </Tip>
-                        ) : null}
-                      </div>
                     </div>
-                  )
-                }
-                label={sessionsLabel}
-                labelMeta={
-                  worktreeGroupingActive ? (
-                    reposScanning && !projectsSkeletonVisible ? (
-                      <GlyphSpinner ariaLabel={s.loading} className="text-[0.6875rem] text-(--ui-text-quaternary)" />
-                    ) : undefined
+                  </div>
+                )
+              }
+              hideHeader={sessionsLabel === s.sessions}
+              label={sessionsLabel}
+              labelMeta={
+                worktreeGroupingActive ? (
+                  reposScanning && !projectsSkeletonVisible ? (
+                    <GlyphSpinner ariaLabel={s.loading} className="text-[0.6875rem] text-(--ui-text-quaternary)" />
                   ) : undefined
-                }
-                liveSessions={inProject ? agentSessions : undefined}
-                manualOrderIds={agentOrderManual ? agentOrderIds : undefined}
-                onArchiveSession={onArchiveSession}
-                onBranchSession={onBranchSession}
-                onDeleteSession={onDeleteSession}
-                onEnterProject={onEnterProject}
-                onNewSessionInWorkspace={showAllProfiles ? undefined : onNewSessionInWorkspace}
-                onReorderProjects={showAllProfiles ? undefined : reorderProjects}
-                onReorderSessions={showAllProfiles ? undefined : reorderSessions}
-                onResumeSession={onResumeSession}
-                onToggle={() => setSidebarRecentsOpen(!agentsOpen)}
-                onTogglePin={pinSession}
-                open={agentsOpen}
-                pinned={false}
-                projectBackRow={
-                  inProject ? <ProjectBackRow label={s.projects.back} onClick={exitProjectScope} /> : undefined
-                }
-                projectContent={inProject ? enteredProjectContent : undefined}
-                projectOverview={projectOverview}
-                projectOverviewPreviews={overviewPreviews}
-                projectRepoWorktrees={inProject ? scopedRepoWorktrees : undefined}
-                projectsLoading={worktreeGroupingActive ? projectTreeLoading : false}
-                removedSessionIds={inProject ? removedSessionIds : undefined}
-                rootClassName={cn(
-                  'min-h-32 flex-1 overflow-hidden p-0',
-                  !recentsVirtualizes && 'compact:min-h-0 compact:flex-none compact:overflow-visible'
-                )}
-                sessions={displayAgentSessions}
-                sortable={!showAllProfiles && agentSessions.length > 1}
-                workingSessionIdSet={workingSessionIdSet}
-              />
-            )}
+                ) : undefined
+              }
+              liveSessions={inProject ? agentSessions : undefined}
+              manualOrderIds={agentOrderManual ? agentOrderIds : undefined}
+              onArchiveSession={onArchiveSession}
+              onBranchSession={onBranchSession}
+              onDeleteSession={onDeleteSession}
+              onEnterProject={onEnterProject}
+              onNewSessionInWorkspace={showAllProfiles ? undefined : onNewSessionInWorkspace}
+              onReorderProjects={showAllProfiles ? undefined : reorderProjects}
+              onReorderSessions={showAllProfiles ? undefined : reorderSessions}
+              onResumeSession={onResumeSession}
+              onToggle={() => setSidebarRecentsOpen(!agentsOpen)}
+              onTogglePin={pinSession}
+              open={agentsOpen}
+              pinned={false}
+              projectBackRow={
+                inProject ? <ProjectBackRow label={s.projects.back} onClick={exitProjectScope} /> : undefined
+              }
+              projectContent={inProject ? enteredProjectContent : undefined}
+              projectOverview={projectOverview}
+              projectOverviewPreviews={overviewPreviews}
+              projectRepoWorktrees={inProject ? scopedRepoWorktrees : undefined}
+              projectsLoading={worktreeGroupingActive ? projectTreeLoading : false}
+              removedSessionIds={inProject ? removedSessionIds : undefined}
+              rootClassName={cn(
+                'min-h-32 flex-1 overflow-hidden p-0',
+                !recentsVirtualizes && 'compact:min-h-0 compact:flex-none compact:overflow-visible'
+              )}
+              sessions={displayAgentSessions}
+              sortable={!showAllProfiles && agentSessions.length > 1}
+              workingSessionIdSet={workingSessionIdSet}
+            />
 
-            {!trimmedQuery &&
-              !worktreeGroupingActive &&
+            {!worktreeGroupingActive &&
               messagingGroups.map(group => {
                 const visible = messagingVisible[group.sourceId] ?? NON_SESSION_INITIAL_ROWS
                 const shownSessions = group.sessions.slice(0, visible)
@@ -1494,7 +1350,7 @@ export function ChatSidebar({
                 )
               })}
 
-            {!trimmedQuery && !worktreeGroupingActive && cronJobs.length > 0 && (
+            {!worktreeGroupingActive && cronJobs.length > 0 && (
               <SidebarCronJobsSection
                 jobs={cronJobs}
                 label={s.cronJobs}

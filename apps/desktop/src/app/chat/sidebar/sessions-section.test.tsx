@@ -1,4 +1,4 @@
-import { cleanup, render } from '@testing-library/react'
+import { cleanup, render, screen } from '@testing-library/react'
 import type * as React from 'react'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 
@@ -180,5 +180,28 @@ describe('SidebarSessionsSection memoization & virtualizer stability', () => {
 
     const thirdRowsRef = mockVirtualListPropsHistory[2].rows
     expect(thirdRowsRef).not.toBe(secondRowsRef)
+  })
+
+  it('can hide a redundant sessions heading without hiding its content', () => {
+    render(
+      <SidebarSessionsSection
+        activeSessionId={null}
+        emptyState={<div>Empty</div>}
+        hideHeader
+        label="Sessions"
+        onArchiveSession={noop}
+        onDeleteSession={noop}
+        onResumeSession={noop}
+        onToggle={noop}
+        onTogglePin={noop}
+        open={true}
+        pinned={false}
+        sessions={[makeSession('session-1')]}
+        workingSessionIdSet={new Set()}
+      />
+    )
+
+    expect(screen.queryByText('Sessions')).toBeNull()
+    expect(screen.getByTestId('session-row-session-1')).not.toBeNull()
   })
 })

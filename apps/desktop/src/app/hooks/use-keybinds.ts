@@ -24,13 +24,7 @@ import {
   openFindBar
 } from '@/store/find-in-page'
 import { $capture, $comboIndex, endCapture, setBinding } from '@/store/keybinds'
-import {
-  requestSessionSearchFocus,
-  setFileBrowserOpen,
-  toggleFileBrowserOpen,
-  togglePanesFlipped,
-  toggleSidebarOpen
-} from '@/store/layout'
+import { setFileBrowserOpen, toggleFileBrowserOpen, togglePanesFlipped, toggleSidebarOpen } from '@/store/layout'
 import { openFolderAsProject } from '@/store/projects'
 import { toggleReview } from '@/store/review'
 import { $selectedStoredSessionId, setModelPickerOpen } from '@/store/session'
@@ -175,7 +169,6 @@ export function useKeybinds(deps: KeybindRuntimeDeps): void {
     'session.next': () => cycleTab(1),
     'session.prev': () => cycleTab(-1),
     ...sessionSlotHandlers,
-    'session.focusSearch': requestSessionSearchFocus,
     'session.togglePin': deps.toggleSelectedPin,
     // openWorktreeDialog resolves the target. There is no test for a repo
     // here, so the key works from a detached session that sits inside a

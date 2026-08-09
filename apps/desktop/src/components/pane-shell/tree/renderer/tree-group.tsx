@@ -215,6 +215,11 @@ export function TreeGroup({
   // begins; rounding the navigation rail instead makes that boundary look
   // backwards (and leaves its right edge floating in the window).
   const isSessionsRail = activeId === 'sessions'
+  // The workspace is the app's anchored primary surface. Give only its
+  // upper-left edge the same explicit curve as the Codex workspace, so the
+  // sidebar-to-content transition reads as a pane boundary instead of a
+  // square continuation of the window chrome.
+  const isWorkspaceGroup = node.panes.some(id => paneChrome(paneFor(id)).uncloseable)
 
   // KEEP-ALIVE: every pane that has been ACTIVE in this zone stays mounted —
   // an inactive tab merely hides (visibility), it does not unmount. Remounting
@@ -341,7 +346,11 @@ export function TreeGroup({
     <div
       className={cn(
         'relative flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden bg-(--ui-editor-surface-background)',
-        isSessionsRail ? 'm-0 rounded-none' : 'm-1.5 rounded-[var(--radius-xl)]'
+        isSessionsRail
+          ? 'm-0 rounded-none'
+          : isWorkspaceGroup
+            ? 'm-0 rounded-tl-[var(--radius-xl)] border-l border-t border-(--ui-stroke-secondary)'
+            : 'm-1.5 rounded-[var(--radius-xl)]'
       )}
       data-tree-group={node.id}
       // Advertises the visible tab strip so panes can drop their own

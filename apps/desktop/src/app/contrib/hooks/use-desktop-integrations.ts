@@ -1,3 +1,4 @@
+import { useStore } from '@nanostores/react'
 import { useEffect, useRef } from 'react'
 
 import { closeActiveTab } from '@/app/chat/close-tab'
@@ -6,6 +7,7 @@ import { storedSessionIdForNotification } from '@/lib/session-ids'
 import { respondToApprovalAction } from '@/store/native-notifications'
 import { openFolderAsProject } from '@/store/projects'
 import {
+  $sessions,
   getRememberedRoute,
   getRememberedSessionId,
   sessionBelongsToProfile,
@@ -34,6 +36,23 @@ interface DesktopIntegrationsParams {
   routedSessionId: null | string
   runtimeIdByStoredSessionId: { readonly current: Map<string, string> }
   sessions: readonly RememberedSession[]
+}
+
+/**
+ * Keeps the session-list subscription outside the wiring controller.
+ *
+ * The list refreshes independently of the active chat (for example after a
+ * background turn or sidebar sync). These integrations need it only to
+ * restore and remember routes, so keeping its subscription at the controller
+ * root also reconciled every global overlay on each refresh. This null-render
+ * boundary confines that work to the integrations lifecycle.
+ */
+export function DesktopIntegrationsBridge(props: Omit<DesktopIntegrationsParams, 'sessions'>): null {
+  const sessions = useStore($sessions)
+
+  useDesktopIntegrations({ ...props, sessions })
+
+  return null
 }
 
 /**

@@ -36,6 +36,7 @@ import { BillingSettings } from './billing'
 import { ConfigSettings } from './config-settings'
 import { SECTIONS } from './constants'
 import { GatewaySettings } from './gateway-settings'
+import { GeneralSettings } from './general-settings'
 import { KeybindSettings } from './keybind-settings'
 import { KEYS_VIEWS, KeysSettings, type KeysView } from './keys-settings'
 import { NotificationsSettings } from './notifications-settings'
@@ -45,6 +46,7 @@ import { SessionsSettings } from './sessions-settings'
 import type { SettingsPageProps, SettingsView as SettingsViewId } from './types'
 
 const SETTINGS_VIEWS: readonly SettingsViewId[] = [
+  'general',
   ...SECTIONS.map(s => `config:${s.id}` as SettingsViewId),
   'providers',
   'gateway',
@@ -140,6 +142,13 @@ export function SettingsView({ onClose, onConfigSaved, onMainModelChanged }: Set
 
   const navGroups: OverlayNavGroup[] = useMemo(
     () => [
+      {
+        active: activeView === 'general',
+        icon: Settings2,
+        id: 'general',
+        label: t.settings.nav.general,
+        onSelect: () => setActiveView('general')
+      },
       ...SECTIONS.filter(s => s.id !== 'advanced').map(s => {
         const view = `config:${s.id}` as SettingsViewId
 
@@ -310,7 +319,9 @@ export function SettingsView({ onClose, onConfigSaved, onMainModelChanged }: Set
         <OverlayNav footer={navFooter} groups={navGroups} />
 
         <OverlayMain className="px-0 pb-0">
-          {activeView === 'config:appearance' ? (
+          {activeView === 'general' ? (
+            <GeneralSettings />
+          ) : activeView === 'config:appearance' ? (
             <AppearanceSettings />
           ) : activeView === 'about' ? (
             <AboutSettings />
@@ -330,7 +341,6 @@ export function SettingsView({ onClose, onConfigSaved, onMainModelChanged }: Set
               onClose={onClose}
               onConfigSaved={onConfigSaved}
               onMainModelChanged={onMainModelChanged}
-              onViewChange={setProviderView}
               view={providerView}
             />
           ) : activeView === 'keys' ? (

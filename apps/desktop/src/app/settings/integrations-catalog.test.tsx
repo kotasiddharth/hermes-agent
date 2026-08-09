@@ -70,7 +70,7 @@ function catalogEntry(patch: Partial<McpCatalogEntry> = {}): McpCatalogEntry {
   }
 }
 
-async function renderCatalog(props: { onlyInstalled?: boolean } = {}) {
+async function renderCatalog(props: { onlyInstalled?: boolean; query?: string } = {}) {
   const { IntegrationsCatalog } = await import('./integrations-catalog')
   let result: ReturnType<typeof render>
 
@@ -166,6 +166,23 @@ describe('IntegrationsCatalog', () => {
 
     expect(await screen.findByRole('button', { name: 'Ready Notion' })).toBeTruthy()
     expect(screen.queryByText('Linear')).toBeNull()
+  })
+
+  it('does not show an unrelated Google Workspace connect action in filtered results', async () => {
+    await renderCatalog({ query: 'linear' })
+
+    expect(await screen.findByRole('button', { name: 'Install Linear' })).toBeTruthy()
+    expect(screen.queryByRole('button', { name: 'Connect Google Workspace' })).toBeNull()
+  })
+
+  it('waits for the saved Google connection state before offering Connect', async () => {
+    getGoogleWorkspaceStatus.mockReturnValue(new Promise(() => undefined))
+
+    await renderCatalog()
+
+    const checking = await screen.findByRole('button', { name: /Loading integrations.*Google Workspace/ })
+    expect((checking as HTMLButtonElement).disabled).toBe(true)
+    expect(screen.queryByRole('button', { name: 'Connect Google Workspace' })).toBeNull()
   })
 
   it('only asks an OAuth integration to sign in when its saved token is missing', async () => {

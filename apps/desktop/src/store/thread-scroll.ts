@@ -41,7 +41,7 @@ export const onScrollToBottomRequest = (handler: () => void) => {
 
 export const requestScrollToBottom = () => handlers.forEach(handler => handler())
 
-// Inline edit grows a sticky human bubble. Fire on pointerdown so the viewport
+// Inline edit can change a turn's height. Fire on pointerdown so the viewport
 // escapes stick-to-bottom before focus/layout; close clears the edit flag when
 // the inline composer unmounts.
 const editOpenHandlers = new Set<() => void>()

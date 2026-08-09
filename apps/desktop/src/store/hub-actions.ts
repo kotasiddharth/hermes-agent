@@ -11,6 +11,17 @@ const POLL_MS = 1200
 // Shared with hub.tsx's sources useQuery so a finished action refreshes the
 // installed map.
 export const HUB_SOURCES_KEY = ['skill-hub-sources'] as const
+
+/**
+ * Hub installs belong to a profile. Keep the profile in each cache key so a
+ * profile swap cannot briefly render another profile's installed map while its
+ * own source request is in flight. `HUB_SOURCES_KEY` stays the shared prefix
+ * for action invalidation.
+ */
+export function hubSourcesQueryKey(profile: null | string | undefined) {
+  return [...HUB_SOURCES_KEY, normalizeProfileKey(profile)] as const
+}
+
 // The Capabilities Skills-list query key (see app/skills/index.tsx) — kept in
 // sync here so a hub (un)install updates the Skills tab, not just the hub.
 const SKILLS_LIST_KEY = ['skills-list'] as const

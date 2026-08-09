@@ -12,9 +12,8 @@ import { Check, Download, Loader2, Palette, Trash2 } from '@/lib/icons'
 import { selectableCardClass } from '@/lib/selectable-card'
 import { normalize } from '@/lib/text'
 import { cn } from '@/lib/utils'
-import { $backdrop, setBackdrop } from '@/store/backdrop'
 import { $embedAllowed, $embedMode, clearEmbedAllowed, type EmbedMode, setEmbedMode } from '@/store/embed-consent'
-import { $activeGatewayProfile, $profiles, normalizeProfileKey } from '@/store/profile'
+import { $glassPreset, type GlassPreset, setGlassPreset } from '@/store/glass'
 import { $reactionsEnabled, setReactionsEnabled } from '@/store/reactions-enabled'
 import { $toolViewMode, setToolViewMode } from '@/store/tool-view'
 import { $translucency, setTranslucency } from '@/store/translucency'
@@ -74,6 +73,21 @@ function ThemePreview({ name, mode }: { name: string; mode: 'light' | 'dark' }) 
 const UI_SCALE_PRESETS = ['90', '100', '110', '125', '150', '175'] as const
 
 type UiScalePreset = (typeof UI_SCALE_PRESETS)[number]
+
+const WINDOW_TRANSLUCENCY_PRESETS = {
+  solid: 0,
+  soft: 20,
+  clear: 45
+} as const
+
+type WindowTranslucencyPreset = keyof typeof WINDOW_TRANSLUCENCY_PRESETS
+
+function matchWindowTranslucencyPreset(intensity: number): WindowTranslucencyPreset {
+  return (Object.entries(WINDOW_TRANSLUCENCY_PRESETS) as Array<[WindowTranslucencyPreset, number]>).reduce(
+    (closest, candidate) =>
+      Math.abs(candidate[1] - intensity) < Math.abs(closest[1] - intensity) ? candidate : closest
+  )[0]
+}
 
 function matchUiScalePreset(percent: number): UiScalePreset | null {
   return UI_SCALE_PRESETS.find(preset => Number(preset) === percent) ?? null
@@ -251,12 +265,10 @@ export function AppearanceSettings() {
   const zoomPercent = useStore($zoomPercent)
   const embedMode = useStore($embedMode)
   const embedAllowed = useStore($embedAllowed)
+  const glassPreset = useStore($glassPreset)
   const translucency = useStore($translucency)
   const reactionsEnabled = useStore($reactionsEnabled)
-  const backdrop = useStore($backdrop)
   const installs = useStore($marketplaceInstalls)
-  const profiles = useStore($profiles)
-  const activeProfileKey = normalizeProfileKey(useStore($activeGatewayProfile))
   const a = t.settings.appearance
 
   const [query, setQuery] = useState('')
@@ -277,13 +289,6 @@ export function AppearanceSettings() {
     // Active theme first; stable sort keeps the rest in their original order.
     .sort((a, b) => Number(b.name === themeName) - Number(a.name === themeName))
 
-  // Themes save per profile. Surface that only when the user actually has more
-  // than one profile (single-profile installs never see the distinction).
-  const showProfileNote = profiles.length > 1
-
-  const activeProfileName =
-    profiles.find(profile => normalizeProfileKey(profile.name) === activeProfileKey)?.name ?? activeProfileKey
-
   const modeOptions = MODE_OPTIONS.map(({ id, icon }) => ({ icon, id, label: t.settings.modeOptions[id].label }))
 
   const toolOptions = [
@@ -298,6 +303,18 @@ export function AppearanceSettings() {
   ] as const satisfies readonly { id: EmbedMode; label: string }[]
 
   const uiScaleOptions = UI_SCALE_PRESETS.map(preset => ({ id: preset, label: `${preset}%` }))
+
+  const glassOptions = [
+    { id: 'solid', label: a.glassSolid },
+    { id: 'subtle', label: a.glassSubtle },
+    { id: 'frosted', label: a.glassFrosted }
+  ] as const satisfies readonly { id: GlassPreset; label: string }[]
+
+  const windowTranslucencyOptions = [
+    { id: 'solid', label: a.translucencySolid },
+    { id: 'soft', label: a.translucencySoft },
+    { id: 'clear', label: a.translucencyClear }
+  ] as const satisfies readonly { id: WindowTranslucencyPreset; label: string }[]
 
   const matchedScalePreset = matchUiScalePreset(zoomPercent)
 
@@ -392,11 +409,6 @@ export function AppearanceSettings() {
                   )}
                   <MarketplaceThemeResults installs={installs} onInstalled={name => setTheme(name)} query={query} />
                 </div>
-                {showProfileNote && (
-                  <p className="mt-3 text-[length:var(--conversation-caption-font-size)] leading-(--conversation-caption-line-height) text-(--ui-text-tertiary)">
-                    {a.themeProfileNote(activeProfileName)}
-                  </p>
-                )}
               </>
             }
             description={a.themeDesc}
@@ -435,28 +447,17 @@ export function AppearanceSettings() {
 
           <ListRow
             action={
-              <div className="flex items-center gap-3">
-                <input
-                  aria-label={a.translucencyTitle}
-                  className="h-1 w-40 cursor-pointer appearance-none rounded-full bg-(--ui-stroke-tertiary)"
-                  max={100}
-                  min={0}
-                  onChange={event => {
-                    triggerHaptic('selection')
-                    setTranslucency(Number(event.target.value))
-                  }}
-                  step={5}
-                  style={{ accentColor: 'var(--dt-primary)' }}
-                  type="range"
-                  value={translucency}
-                />
-                <span className="w-9 text-right text-[length:var(--conversation-caption-font-size)] tabular-nums text-(--ui-text-tertiary)">
-                  {translucency}%
-                </span>
-              </div>
+              <SegmentedControl
+                onChange={id => {
+                  triggerHaptic('selection')
+                  setGlassPreset(id)
+                }}
+                options={glassOptions}
+                value={glassPreset}
+              />
             }
-            description={a.translucencyDesc}
-            title={a.translucencyTitle}
+            description={a.glassDesc}
+            title={a.glassTitle}
           />
 
           <ListRow
@@ -464,17 +465,14 @@ export function AppearanceSettings() {
               <SegmentedControl
                 onChange={id => {
                   triggerHaptic('selection')
-                  setBackdrop(id === 'on')
+                  setTranslucency(WINDOW_TRANSLUCENCY_PRESETS[id])
                 }}
-                options={[
-                  { id: 'off', label: t.common.off },
-                  { id: 'on', label: t.common.on }
-                ]}
-                value={backdrop ? 'on' : 'off'}
+                options={windowTranslucencyOptions}
+                value={matchWindowTranslucencyPreset(translucency)}
               />
             }
-            description={a.backdropDesc}
-            title={a.backdropTitle}
+            description={a.translucencyDesc}
+            title={a.translucencyTitle}
           />
 
           <ListRow

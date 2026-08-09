@@ -52,7 +52,7 @@ export function MasterDetail({
     <div className="flex h-full min-h-0 flex-col px-[clamp(1.25rem,4vw,4rem)] py-5">
       <div
         className={cn(
-          'flex min-h-0 flex-1 flex-col overflow-hidden rounded-[var(--radius-xl)] border border-(--ui-stroke-secondary) bg-[color-mix(in_srgb,var(--ui-bg-elevated)_72%,transparent)] shadow-[0_1px_2px_rgb(0_0_0/0.04)]'
+          'glass-elevated flex min-h-0 flex-1 flex-col overflow-hidden rounded-[var(--radius-xl)] border border-(--ui-stroke-secondary) shadow-[0_1px_2px_rgb(0_0_0/0.04)]'
         )}
       >
         <div

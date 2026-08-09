@@ -149,7 +149,6 @@ interface SidebarSessionsSectionProps {
   // Tag every row with its owning profile. Set on the flat cross-profile
   // lists (Pinned / search results) in the All-profiles view, where no group
   // header communicates ownership (#66003).
-  showProfileTags?: boolean
   // Insert "Yesterday" / "Last week" date dividers into the chronological
   // session list (flat recents + entered-project lanes). Off for hand-ordered
   // lists, pinned, messaging groups, and the project overview, where the order
@@ -196,7 +195,6 @@ export function SidebarSessionsSection({
   onReorderProjects,
   projectBackRow,
   dndSensors,
-  showProfileTags = false,
   dateGrouped = false
 }: SidebarSessionsSectionProps) {
   const { t } = useI18n()
@@ -243,8 +241,7 @@ export function SidebarSessionsSection({
         onPin: () => onTogglePin(sessionPinId(session)),
         onResume: () => onResumeSession(session.id),
         reorderable: draggable && !branchStem,
-        session,
-        showProfile: showProfileTags
+        session
       }
 
       return draggable && !branchStem ? (
@@ -261,7 +258,6 @@ export function SidebarSessionsSection({
       onResumeSession,
       onTogglePin,
       pinned,
-      showProfileTags,
       workingSessionIdSet
     ]
   )
@@ -421,7 +417,6 @@ export function SidebarSessionsSection({
         onTogglePin={onTogglePin}
         pinned={pinned}
         rows={flatRows}
-        showProfileTags={showProfileTags}
         sortable={sessionsDraggable}
         workingSessionIdSet={workingSessionIdSet}
       />

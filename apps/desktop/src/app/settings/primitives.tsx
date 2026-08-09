@@ -43,7 +43,7 @@ export function SettingsGroup({ children, className }: { children: ReactNode; cl
   return (
     <div
       className={cn(
-        'divide-y divide-(--ui-stroke-quaternary) overflow-hidden rounded-2xl border border-(--ui-stroke-secondary) bg-[color-mix(in_srgb,var(--ui-bg-elevated)_72%,transparent)] shadow-[0_1px_2px_rgb(0_0_0/0.04)]',
+        'glass-elevated divide-y divide-(--ui-stroke-quaternary) overflow-hidden rounded-2xl border border-(--ui-stroke-secondary) shadow-[0_1px_2px_rgb(0_0_0/0.04)]',
         className
       )}
     >

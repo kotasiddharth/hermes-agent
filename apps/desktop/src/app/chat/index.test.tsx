@@ -34,12 +34,6 @@ vi.mock('@/components/assistant-ui/thread', async () => {
   }
 })
 
-vi.mock('@/components/Backdrop', async () => {
-  const React = await import('react')
-
-  return { Backdrop: () => React.createElement('div', { 'data-testid': 'backdrop' }) }
-})
-
 vi.mock('@/components/prompt-overlays', () => ({ PromptOverlays: () => null }))
 vi.mock('@/components/chat/vibe-hearts', () => ({ COMPOSER_HEART_CONFIG: {}, HeartField: () => null }))
 vi.mock('@/lib/model-options', () => ({

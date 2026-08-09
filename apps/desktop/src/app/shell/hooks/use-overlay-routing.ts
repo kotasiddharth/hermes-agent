@@ -23,7 +23,6 @@ export function useOverlayRouting() {
   const agentsOpen = currentView === 'agents'
   const starmapOpen = currentView === 'starmap'
   const cronOpen = currentView === 'cron'
-  const profilesOpen = currentView === 'profiles'
   const webhooksOpen = currentView === 'webhooks'
   const chatOpen = currentView === 'chat'
   const overlayOpen = isOverlayView(currentView)
@@ -80,7 +79,6 @@ export function useOverlayRouting() {
     openAgents,
     openCommandCenterSection,
     openStarmap,
-    profilesOpen,
     resetOverlayReturnRoute,
     settingsOpen,
     starmapOpen,

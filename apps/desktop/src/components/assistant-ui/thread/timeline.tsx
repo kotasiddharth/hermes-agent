@@ -2,7 +2,6 @@ import { useAui, useAuiState } from '@assistant-ui/react'
 import { type FC, useCallback, useEffect, useMemo, useRef, useState } from 'react'
 
 import { usePaneVisible } from '@/components/pane-shell/pane-visibility'
-import { Codicon } from '@/components/ui/codicon'
 import { useI18n } from '@/i18n'
 import { triggerHaptic } from '@/lib/haptics'
 import { cn } from '@/lib/utils'
@@ -15,21 +14,18 @@ import {
   type TimelineSourceMessage
 } from './timeline-data'
 
-const MIN_ENTRIES = 4
+const MIN_ENTRIES = 2
 const VIEWPORT = '[data-slot="aui_thread-viewport"]'
 const HOVER_CLOSE_MS = 140
 
 const ROW_CLASS =
   'row-hover relative flex w-full min-w-0 max-w-full select-none overflow-hidden rounded-[var(--radius-sm)] px-2.5 py-1.5 text-left text-[0.75rem] outline-hidden hover:bg-(--ui-row-hover-background)'
 
-const HISTORY_TRIGGER_CLASS =
-  'grid size-7 place-items-center rounded-[var(--radius-sm)] border border-(--ui-stroke-tertiary) bg-[color-mix(in_srgb,var(--ui-bg-elevated)_84%,transparent)] text-(--ui-text-tertiary) shadow-[0_1px_2px_rgb(0_0_0/0.04)] transition-[background-color,border-color,color,transform] duration-200 ease-out hover:-translate-y-px hover:border-(--ui-stroke-secondary) hover:bg-(--chrome-action-hover) hover:text-foreground focus-visible:border-ring focus-visible:outline-none focus-visible:ring-[0.1875rem] focus-visible:ring-ring/50'
-
 // Surface (border-color/bg/shadow/blur) comes from the shared
 // `[data-slot='thread-timeline-popover']` rule in styles.css, so it's 1:1 with
 // the dropdown/select/dialog menus. We only own layout + the border/radius here.
 const POPOVER_SHELL =
-  'absolute right-full top-1/2 z-50 max-h-[min(22rem,calc(100vh-8rem))] w-80 max-w-[min(20rem,calc(100vw-2rem))] -translate-y-1/2 overflow-x-hidden overflow-y-auto overscroll-contain rounded-lg border p-1 text-popover-foreground transition-[opacity,transform] duration-100 ease-out group-hover/timeline:transition-none'
+  'absolute left-full top-1/2 z-50 ml-2 max-h-[min(22rem,calc(100vh-8rem))] w-80 max-w-[min(20rem,calc(100vw-2rem))] -translate-y-1/2 overflow-x-hidden overflow-y-auto overscroll-contain rounded-lg border p-1 text-popover-foreground transition-[opacity,transform] duration-100 ease-out group-hover/timeline:transition-none'
 
 function userPromptText(content: unknown): string {
   if (typeof content === 'string') {
@@ -130,9 +126,10 @@ function scrollToPrompt(root: HTMLElement | null, id: string) {
 }
 
 /**
- * Right-edge conversation history — hover previews, click to jump. ≥4 user
- * turns only. A single named control keeps long chats discoverable without
- * covering the transcript edge in anonymous tick marks.
+ * Left-edge conversation history — compact prompt lines, hover previews, and
+ * click-to-jump. It stays quiet (two or more human turns only) but preserves a
+ * quick visual map of where each turn begins without pinning old prompts above
+ * the response being read.
  *
  * Everything here is DEFERRED until it can actually be seen. A chat surface
  * stays mounted while its tab is in the background (keep-alive, see
@@ -142,8 +139,8 @@ function scrollToPrompt(root: HTMLElement | null, id: string) {
  *
  *  1. INACTIVE PANE → render null and subscribe to nothing. The transcript
  *     selector, the scroll listener, and the popover markup all stand down.
- *  2. ACTIVE BUT UNHOVERED → the history control paints, but the popover's
- *     rows are not built at all; previews only exist once it is opened.
+ *  2. ACTIVE BUT UNHOVERED → only the tiny line rail paints; the popover's
+ *     rows are not built at all until it is hovered or focused.
  *  3. BELOW THE THRESHOLD → the rail renders null, so the measure effect never
  *     touches layout for it.
  *  4. FOLLOWING THE BOTTOM → the active prompt is the last one by definition,
@@ -321,7 +318,7 @@ const ActiveThreadTimeline: FC = () => {
   return (
     <div
       aria-label={t.assistant.thread.conversationHistory}
-      className="group/timeline pointer-events-auto absolute right-3 top-1/2 z-40 flex -translate-y-1/2 flex-col items-end"
+      className="group/timeline pointer-events-auto absolute left-3 top-1/2 z-40 flex -translate-y-1/2 flex-col items-start"
       data-slot="thread-timeline"
       data-suppress-pane-reveal=""
       onMouseEnter={keepOpen}
@@ -329,18 +326,33 @@ const ActiveThreadTimeline: FC = () => {
       ref={rootRef}
       role="navigation"
     >
-      <button
-        aria-expanded={open}
-        aria-label={t.assistant.thread.browseConversationHistory}
-        className={HISTORY_TRIGGER_CLASS}
-        data-slot="thread-timeline-trigger"
-        onBlur={closeSoon}
-        onClick={keepOpen}
-        onFocus={keepOpen}
-        type="button"
-      >
-        <Codicon name="history" size="0.875rem" />
-      </button>
+      <div className="flex max-h-[min(40vh,14rem)] flex-col justify-center gap-1 py-1" data-slot="thread-timeline-ticks">
+        {entries.map((entry, index) => (
+          <button
+            aria-current={index === activeIndex ? 'step' : undefined}
+            aria-label={entry.preview}
+            className="group/tick flex h-3 w-6 items-center rounded-sm text-left focus-visible:outline-none focus-visible:ring-[0.1875rem] focus-visible:ring-ring/50"
+            key={entry.id}
+            onBlur={closeSoon}
+            onClick={() => {
+              keepOpen()
+              jump(entry.id)
+            }}
+            onFocus={keepOpen}
+            type="button"
+          >
+            <span
+              aria-hidden="true"
+              className={cn(
+                'block h-px rounded-full transition-[width,background-color,opacity] duration-150 ease-out',
+                index === activeIndex
+                  ? 'w-6 bg-(--ui-text-secondary) opacity-90'
+                  : 'w-3 bg-(--ui-text-quaternary) opacity-70 group-hover/tick:w-5 group-hover/tick:bg-(--ui-text-secondary) group-focus-visible/tick:w-5 group-focus-visible/tick:bg-(--ui-text-secondary)'
+              )}
+            />
+          </button>
+        ))}
+      </div>
       <TimelinePopover
         activeIndex={activeIndex}
         entries={entries}
@@ -375,7 +387,7 @@ const TimelinePopover: FC<{
     <div
       className={cn(
         POPOVER_SHELL,
-        open ? 'pointer-events-auto opacity-100 translate-x-0' : 'pointer-events-none translate-x-1 opacity-0'
+        open ? 'pointer-events-auto opacity-100 translate-x-0' : 'pointer-events-none -translate-x-1 opacity-0'
       )}
       data-slot="thread-timeline-popover"
     >

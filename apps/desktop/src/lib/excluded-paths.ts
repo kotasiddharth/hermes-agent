@@ -23,7 +23,7 @@ export const ALWAYS_EXCLUDED = new Set([
   'out',
   'target',
   'vendor',
-  'Pods',
+  'pods',
   '.next',
   '.nuxt',
   '.svelte-kit',
@@ -35,10 +35,13 @@ export const ALWAYS_EXCLUDED = new Set([
   '.expo',
   '.angular',
   'coverage',
-  '.DS_Store',
-  'Thumbs.db'
+  '.ds_store',
+  'thumbs.db',
+  // Runtime instruction files are implementation details, not project content.
+  'soul.md'
 ])
 
 // True when any segment of a relative path is excluded (review rows like
 // `node_modules/.bin/foo` or a bare `.DS_Store`). Handles `/` and `\`.
-export const isExcludedPath = (relPath: string): boolean => relPath.split(/[/\\]/).some(seg => ALWAYS_EXCLUDED.has(seg))
+export const isExcludedPath = (relPath: string): boolean =>
+  relPath.split(/[/\\]/).some(seg => ALWAYS_EXCLUDED.has(seg.toLowerCase()))

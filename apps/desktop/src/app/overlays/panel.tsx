@@ -125,7 +125,7 @@ export function PanelList({
     // beside the detail when wide.
     <div
       className={cn(
-        'flex w-full shrink-0 flex-col overflow-hidden rounded-[var(--radius-xl)] border border-(--ui-stroke-secondary) bg-[color-mix(in_srgb,var(--ui-bg-elevated)_72%,transparent)] shadow-[0_1px_2px_rgb(0_0_0/0.04)] max-[47.5rem]:max-h-[40%] min-[47.5rem]:w-56',
+        'glass-elevated flex w-full shrink-0 flex-col overflow-hidden rounded-[var(--radius-xl)] border border-(--ui-stroke-secondary) shadow-[0_1px_2px_rgb(0_0_0/0.04)] max-[47.5rem]:max-h-[40%] min-[47.5rem]:w-56',
         className
       )}
     >
@@ -288,7 +288,7 @@ export function PanelDetail({ children, className }: { children: ReactNode; clas
   return (
     <div
       className={cn(
-        'min-h-0 flex-1 overflow-y-auto overscroll-contain rounded-[var(--radius-xl)] border border-(--ui-stroke-secondary) bg-[color-mix(in_srgb,var(--ui-bg-elevated)_72%,transparent)] shadow-[0_1px_2px_rgb(0_0_0/0.04)]',
+        'glass-elevated min-h-0 flex-1 overflow-y-auto overscroll-contain rounded-[var(--radius-xl)] border border-(--ui-stroke-secondary) shadow-[0_1px_2px_rgb(0_0_0/0.04)]',
         className
       )}
     >

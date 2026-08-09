@@ -37,8 +37,6 @@ type IntegrationAction = 'activate' | 'install' | 'ready' | 'sign-in'
 interface IntegrationsCatalogProps {
   /** Optional hub search term; matching is deliberately client-side because the curated catalog is small. */
   query?: string
-  /** Keeps installed entries in the Hub's shared Installed section instead of repeating them below. */
-  hideInstalled?: boolean
   /** Shows only integrations that have already been added to this profile. */
   onlyInstalled?: boolean
   /** Do not leave an empty section behind when another content type has results. */
@@ -51,6 +49,21 @@ interface IntegrationsCatalogProps {
   description?: null | string
   /** Optional empty-state copy for embedded surfaces with a narrower scope. */
   emptyDescription?: string
+  /** Browse Hub uses concise summaries; Settings keeps the full explanation. */
+  compactDescriptions?: boolean
+}
+
+const COMPACT_DESCRIPTION_LIMIT = 120
+
+function compactDescription(description: string): string {
+  const normalized = description.replace(/\s+/g, ' ').trim()
+
+  if (normalized.length <= COMPACT_DESCRIPTION_LIMIT) {
+    return normalized
+  }
+
+
+  return `${normalized.slice(0, COMPACT_DESCRIPTION_LIMIT).trimEnd()}…`
 }
 
 function Tag({ children }: { children: string }) {
@@ -63,6 +76,12 @@ function Tag({ children }: { children: string }) {
 
 function requiredEnvironmentIsMissing(entry: McpCatalogEntry, values: Record<string, string>): boolean {
   return entry.required_env.some(env => env.required && !values[env.name]?.trim())
+}
+
+function matchesGoogleWorkspaceQuery(query: string, title: string, description: string): boolean {
+  const term = query.trim().toLocaleLowerCase()
+
+  return !term || [title, description, 'google workspace'].some(value => value.toLocaleLowerCase().includes(term))
 }
 
 function actionFor(entry: McpCatalogEntry): IntegrationAction {
@@ -100,9 +119,9 @@ export function matchesIntegrationCatalogQuery(entry: McpCatalogEntry, query: st
  * launches. There is deliberately no separate connect/manage screen.
  */
 export function IntegrationsCatalog({
+  compactDescriptions = false,
   description,
   emptyDescription,
-  hideInstalled = false,
   hideWhenEmpty = false,
   meta,
   onlyInstalled = false,
@@ -131,11 +150,27 @@ export function IntegrationsCatalog({
 
   const entries = [...(catalogQuery.data?.entries ?? [])]
     .filter(entry => matchesIntegrationCatalogQuery(entry, query))
-    .filter(entry => (onlyInstalled ? entry.installed : !hideInstalled || !entry.installed))
+    .filter(entry => !onlyInstalled || entry.installed)
     .sort((a, b) => Number(b.installed) - Number(a.installed) || prettyName(a.name).localeCompare(prettyName(b.name)))
 
   const googleConnected = googleWorkspaceQuery.data?.connected === true
-  const showGoogleWorkspace = onlyInstalled ? googleConnected : !hideInstalled || !googleConnected
+
+  const showGoogleWorkspace =
+    matchesGoogleWorkspaceQuery(query, p.googleWorkspaceTitle, p.googleWorkspaceDescription) &&
+    (onlyInstalled ? googleConnected : true)
+
+  // Saved OAuth state is profile-scoped. Do not offer a new connection until
+  // that profile's existing token has been checked.
+  const googleStatusPending = googleWorkspaceQuery.isError || googleWorkspaceQuery.isLoading
+
+  const googleActionLabel = connectingGoogle
+    ? p.googleWorkspaceConnecting
+    : googleStatusPending
+      ? p.integrationsLoading
+      : googleConnected
+        ? p.googleWorkspaceConnected
+        : p.googleWorkspaceConnect
+
 
   const readyCount =
     entries.filter(entry => entry.installed && entry.enabled && entry.authenticated !== false).length +
@@ -297,20 +332,16 @@ export function IntegrationsCatalog({
     <ListRow
       action={
         <Button
-          aria-label={`${googleConnected ? p.googleWorkspaceConnected : p.googleWorkspaceConnect} ${p.googleWorkspaceTitle}`}
-          disabled={googleConnected || connectingGoogle || googleWorkspaceQuery.isLoading}
+          aria-label={`${googleActionLabel} ${p.googleWorkspaceTitle}`}
+          disabled={googleConnected || connectingGoogle || googleStatusPending}
           onClick={() => void connectGoogleWorkspace()}
           size="xs"
           variant={googleConnected ? 'secondary' : 'default'}
         >
-          {connectingGoogle
-            ? p.googleWorkspaceConnecting
-            : googleConnected
-              ? p.googleWorkspaceConnected
-              : p.googleWorkspaceConnect}
+          {googleActionLabel}
         </Button>
       }
-      description={p.googleWorkspaceDescription}
+      description={compactDescriptions ? compactDescription(p.googleWorkspaceDescription) : p.googleWorkspaceDescription}
       title={p.googleWorkspaceTitle}
     />
   ) : null
@@ -417,7 +448,7 @@ export function IntegrationsCatalog({
                     </div>
                   )
                 }
-                description={entry.description}
+                description={compactDescriptions ? compactDescription(entry.description) : entry.description}
                 key={entry.name}
                 title={
                   <span className="flex flex-wrap items-center gap-1.5">

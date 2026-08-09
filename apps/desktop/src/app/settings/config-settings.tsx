@@ -18,7 +18,6 @@ import {
   refreshDataUrlReadMaxMb,
   setDataUrlReadMaxMb
 } from '@/store/data-url-read-max'
-import { $keepAwake, setKeepAwake } from '@/store/keep-awake'
 import { notify, notifyError } from '@/store/notifications'
 import { repoDiscoveryPolicyFromConfig, repoDiscoveryPolicySignature, scanAndRecordRepos } from '@/store/projects'
 import type { ConfigFieldSchema, HermesConfigRecord } from '@/types/hermes'
@@ -28,7 +27,7 @@ import { useOnProfileSwitch } from '../hooks/use-on-profile-switch'
 import { PanelEmpty } from '../overlays/panel'
 
 import { ConfigField } from './config-field'
-import { SECTIONS } from './constants'
+import { ASSISTANT_RESPONSE_STYLE_LABELS, SECTIONS } from './constants'
 import { enumOptionsFor, getNested, isExternalMemoryProvider, sectionFieldEntries, setNested } from './helpers'
 import { MemoryConnect } from './memory/connect'
 import { ProviderConfigPanel } from './memory/provider-config-panel'
@@ -39,10 +38,8 @@ import {
   SettingsContent,
   SettingsGroup,
   SettingsPageHeader,
-  SettingsSkeleton,
-  ToggleRow
+  SettingsSkeleton
 } from './primitives'
-import { QuickEntrySettings } from './quick-entry-settings'
 
 // On the Voice page, only surface the sub-fields of the *selected* TTS/STT
 // provider — otherwise every provider's options render at once (the "totally
@@ -77,7 +74,6 @@ export function ConfigSettings({
 }) {
   const { t } = useI18n()
   const c = t.settings.config
-  const keepAwake = useStore($keepAwake)
   // The editable draft is local (debounced autosave watches it), but it's seeded
   // from — and saved back through — the shared config cache, so edits are visible
   // in the MCP/model surfaces and reopening the page doesn't reload-flash.
@@ -317,25 +313,11 @@ export function ConfigSettings({
           <ModelSettings onMainModelChanged={onMainModelChanged} />
         </div>
       )}
-      {/* Device-local desktop prefs (not config.yaml) — they live here since
-          keeping the machine awake and the global Quick Entry chord are both
-          power-user, this-computer-only knobs. */}
-      {activeSectionId === 'advanced' && (
-        <SettingsGroup className="mb-5">
-          <ToggleRow
-            checked={keepAwake}
-            description={c.keepAwakeDesc}
-            label={c.keepAwakeTitle}
-            onChange={setKeepAwake}
-          />
-          <QuickEntrySettings />
-        </SettingsGroup>
-      )}
-      {/* Device-local attach/preview byte cap (main-process IPC guard). Chat is
-          where image-attachment behavior already lives, so this sits above the
-          schema fields for that section. */}
-      {activeSectionId === 'chat' ? <AttachmentSizeSetting /> : null}
-      {visibleFields.length === 0 && activeSectionId !== 'chat' ? (
+      {/* Device-local attach/preview byte cap (main-process IPC guard). This is
+          deliberately advanced: changing a raw memory limit should not be part
+          of the everyday chat setup. */}
+      {activeSectionId === 'advanced' ? <AttachmentSizeSetting /> : null}
+      {visibleFields.length === 0 && activeSectionId !== 'chat' && activeSectionId !== 'model' ? (
         <EmptyState description={c.emptyDesc} title={c.emptyTitle} />
       ) : visibleFields.length === 0 ? null : (
         <SettingsGroup>
@@ -353,7 +335,13 @@ export function ConfigSettings({
                     : enumOptionsFor(key, getNested(config, key), config)
                 }
                 onChange={value => updateConfig(setNested(config, key, value))}
-                optionLabels={key === 'tts.elevenlabs.voice_id' ? elevenLabsVoiceLabels : undefined}
+                optionLabels={
+                  key === 'display.personality'
+                    ? ASSISTANT_RESPONSE_STYLE_LABELS
+                    : key === 'tts.elevenlabs.voice_id'
+                      ? elevenLabsVoiceLabels
+                      : undefined
+                }
                 schema={field}
                 schemaKey={key}
                 value={getNested(config, key)}

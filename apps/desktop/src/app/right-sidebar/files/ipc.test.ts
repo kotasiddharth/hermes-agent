@@ -124,4 +124,19 @@ describe('readProjectDir', () => {
     expect(result.entries.map(entry => entry.name)).toEqual(['debug.log'])
     expect(readFileDataUrl).not.toHaveBeenCalled()
   })
+
+  it('hides runtime SOUL.md instruction files from the project tree', async () => {
+    gitRoot.mockResolvedValue(null)
+    readDir.mockResolvedValue(
+      ok([
+        { name: 'SOUL.md', path: '/repo/SOUL.md', isDirectory: false },
+        { name: 'soul.md', path: '/repo/soul.md', isDirectory: false },
+        { name: 'README.md', path: '/repo/README.md', isDirectory: false }
+      ])
+    )
+
+    const result = await readProjectDir('/repo')
+
+    expect(result.entries.map(entry => entry.name)).toEqual(['README.md'])
+  })
 })

@@ -117,7 +117,7 @@ import { UpdatesOverlay } from '../updates-overlay'
 
 import { ContribWiringContext } from './context'
 import { useBackgroundSync } from './hooks/use-background-sync'
-import { useDesktopIntegrations } from './hooks/use-desktop-integrations'
+import { DesktopIntegrationsBridge } from './hooks/use-desktop-integrations'
 import { usePetBridge } from './hooks/use-pet-bridge'
 import { useQuickEntryBridge } from './hooks/use-quick-entry-bridge'
 import { useSessionTileDelegate } from './hooks/use-session-tile-delegate'
@@ -132,7 +132,6 @@ const AgentsView = lazy(async () => ({ default: (await import('../agents')).Agen
 const CommandCenterView = lazy(async () => ({ default: (await import('../command-center')).CommandCenterView }))
 const CronView = lazy(async () => ({ default: (await import('../cron')).CronView }))
 const WebhooksView = lazy(async () => ({ default: (await import('../webhooks')).WebhooksView }))
-const ProfilesView = lazy(async () => ({ default: (await import('../profiles')).ProfilesView }))
 const SettingsView = lazy(async () => ({ default: (await import('../settings')).SettingsView }))
 const StarmapView = lazy(async () => ({ default: (await import('../starmap')).StarmapView }))
 
@@ -179,7 +178,6 @@ export function ContribWiring({ children }: { children: ReactNode }) {
   const resumeExhaustedSessionId = useStore($resumeExhaustedSessionId)
   const selectedStoredSessionId = useStore($selectedStoredSessionId)
   const messagingSessions = useStore($messagingSessions)
-  const sessions = useStore($sessions)
   const activeGatewayProfile = useStore($activeGatewayProfile)
   const profileScope = useStore($profileScope)
   const boot = useStore($desktopBoot)
@@ -218,7 +216,6 @@ export function ContribWiring({ children }: { children: ReactNode }) {
     openAgents,
     openCommandCenterSection,
     openStarmap,
-    profilesOpen,
     resetOverlayReturnRoute,
     settingsOpen,
     starmapOpen,
@@ -779,20 +776,6 @@ export function ContribWiring({ children }: { children: ReactNode }) {
   // remembered-session restore, and cross-window session-list sync.
   const previewTarget = useStore($previewTarget)
 
-  useDesktopIntegrations({
-    activeProfile: normalizeProfileKey(activeGatewayProfile),
-    chatOpen,
-    hasPreview: Boolean(previewTarget),
-    locationPathname: location.pathname,
-    navigate,
-    profileReady: boot.phase === 'renderer.ready',
-    refreshSessions,
-    resumeExhaustedSessionId,
-    routedSessionId,
-    runtimeIdByStoredSessionId: runtimeIdByStoredSessionIdRef,
-    sessions
-  })
-
   // Pin/unpin the selected session (statusbar keybind + chat header) — pinned
   // on the durable lineage-root id so it survives auto-compression.
   const toggleSelectedPin = useCallback(() => {
@@ -994,6 +977,18 @@ export function ContribWiring({ children }: { children: ReactNode }) {
 
   return (
     <ContribWiringContext.Provider value={api}>
+      <DesktopIntegrationsBridge
+        activeProfile={normalizeProfileKey(activeGatewayProfile)}
+        chatOpen={chatOpen}
+        hasPreview={Boolean(previewTarget)}
+        locationPathname={location.pathname}
+        navigate={navigate}
+        profileReady={boot.phase === 'renderer.ready'}
+        refreshSessions={refreshSessions}
+        resumeExhaustedSessionId={resumeExhaustedSessionId}
+        routedSessionId={routedSessionId}
+        runtimeIdByStoredSessionId={runtimeIdByStoredSessionIdRef}
+      />
       <div
         className="contents"
         style={
@@ -1095,12 +1090,6 @@ export function ContribWiring({ children }: { children: ReactNode }) {
       {webhooksOpen && (
         <Suspense fallback={null}>
           <WebhooksView onClose={closeOverlayToPreviousRoute} />
-        </Suspense>
-      )}
-
-      {profilesOpen && (
-        <Suspense fallback={null}>
-          <ProfilesView onClose={closeOverlayToPreviousRoute} />
         </Suspense>
       )}
 

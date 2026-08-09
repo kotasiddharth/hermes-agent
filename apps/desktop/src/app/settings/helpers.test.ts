@@ -16,18 +16,30 @@ import {
 } from './helpers'
 
 describe('settings helpers', () => {
-  it('surfaces repository discovery config in Workspace with user-facing copy', () => {
+  it('keeps the Workspace setup simple and moves repository paths to Advanced', () => {
     const workspace = SECTIONS.find(section => section.id === 'workspace')
+    const advanced = SECTIONS.find(section => section.id === 'advanced')
 
-    expect(workspace?.keys).toEqual(
-      expect.arrayContaining([
-        'desktop.repo_scan_enabled',
-        'desktop.repo_scan_roots',
-        'desktop.repo_scan_exclude_paths'
-      ])
-    )
+    expect(workspace?.keys).toEqual(['desktop.repo_scan_enabled'])
+    expect(advanced?.keys).toEqual(expect.arrayContaining(['desktop.repo_scan_roots', 'desktop.repo_scan_exclude_paths']))
     expect(fieldCopyForSchemaKey(FIELD_LABELS, 'desktop.repo_scan_enabled')).toBeTruthy()
     expect(fieldCopyForSchemaKey(FIELD_DESCRIPTIONS, 'desktop.repo_scan_exclude_paths')).toBeTruthy()
+  })
+
+  it('keeps raw limits and low-level behavior out of everyday settings', () => {
+    const chat = SECTIONS.find(section => section.id === 'chat')
+    const advanced = SECTIONS.find(section => section.id === 'advanced')
+
+    expect(chat?.keys).not.toContain('agent.image_input_mode')
+    expect(advanced?.keys).toEqual(
+      expect.arrayContaining([
+        'model_context_length',
+        'file_read_max_chars',
+        'memory.memory_char_limit',
+        'voice.max_recording_seconds',
+        'agent.image_input_mode'
+      ])
+    )
   })
 
   it('does not shadow the backend schema options for memory.provider', () => {
@@ -185,6 +197,17 @@ describe('settings helpers', () => {
   describe('enumOptionsFor — backend selector dropdowns', () => {
     const config: HermesConfigRecord = {}
 
+    it('offers only the supported response styles for new sessions', () => {
+      expect(enumOptionsFor('display.personality', '', config)).toEqual([
+        '',
+        'helpful',
+        'concise',
+        'technical',
+        'creative',
+        'teacher'
+      ])
+    })
+
     it('renders a dropdown for the TTS provider including xAI (Grok)', () => {
       const opts = enumOptionsFor('tts.provider', 'edge', config)
       expect(opts).toBeDefined()
@@ -330,30 +353,31 @@ describe('settings helpers', () => {
   })
 
   describe('sectionFieldEntries', () => {
-    it('renders memory.provider from config even when the backend schema omits it', () => {
+    it('renders memory.provider in Advanced even when the backend schema omits it', () => {
       const schema = { 'memory.memory_enabled': { type: 'boolean' as const } }
       const config: HermesConfigRecord = { memory: { memory_enabled: true, provider: '' } }
 
-      const memoryKeys = (sectionFieldEntries(schema, config).get('memory') ?? []).map(([key]) => key)
+      const advancedKeys = (sectionFieldEntries(schema, config).get('advanced') ?? []).map(([key]) => key)
 
-      expect(memoryKeys).toContain('memory.provider')
+      expect(advancedKeys).toContain('memory.provider')
     })
 
     it('infers the field type from the config value when the schema omits the key', () => {
       const config: HermesConfigRecord = { memory: { provider: '', memory_enabled: true, memory_char_limit: 2200 } }
 
-      const fields = new Map(sectionFieldEntries({}, config).get('memory') ?? [])
+      const memoryFields = new Map(sectionFieldEntries({}, config).get('memory') ?? [])
+      const advancedFields = new Map(sectionFieldEntries({}, config).get('advanced') ?? [])
 
-      expect(fields.get('memory.provider')?.type).toBe('string')
-      expect(fields.get('memory.memory_enabled')?.type).toBe('boolean')
-      expect(fields.get('memory.memory_char_limit')?.type).toBe('number')
+      expect(advancedFields.get('memory.provider')?.type).toBe('string')
+      expect(memoryFields.get('memory.memory_enabled')?.type).toBe('boolean')
+      expect(advancedFields.get('memory.memory_char_limit')?.type).toBe('number')
     })
 
     it('prefers the backend schema entry over inference when both exist', () => {
       const schema = { 'memory.provider': { type: 'select' as const, options: ['honcho'] } }
       const config: HermesConfigRecord = { memory: { provider: 'honcho' } }
 
-      const field = new Map(sectionFieldEntries(schema, config).get('memory') ?? []).get('memory.provider')
+      const field = new Map(sectionFieldEntries(schema, config).get('advanced') ?? []).get('memory.provider')
 
       expect(field?.type).toBe('select')
       expect(field?.options).toEqual(['honcho'])

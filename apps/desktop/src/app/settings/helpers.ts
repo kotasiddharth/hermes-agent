@@ -1,7 +1,7 @@
 import { asText, normalize } from '@/lib/text'
 import type { ConfigFieldSchema, HermesConfigRecord, ToolsetInfo } from '@/types/hermes'
 
-import { BUILTIN_PERSONALITIES, ENUM_OPTIONS, PROVIDER_GROUPS, SECTIONS } from './constants'
+import { ASSISTANT_RESPONSE_STYLES, ENUM_OPTIONS, PROVIDER_GROUPS, SECTIONS } from './constants'
 
 // Canonical implementations live in @/lib/text; re-exported here so the many
 // settings/capabilities call sites keep their import path.
@@ -157,13 +157,8 @@ export function setNested(obj: HermesConfigRecord, path: string, value: unknown)
   return clone
 }
 
-function personalityOptions(config: HermesConfigRecord): string[] {
-  const custom = getNested(config, 'agent.personalities')
-
-  const customNames =
-    custom && typeof custom === 'object' && !Array.isArray(custom) ? Object.keys(custom as Record<string, unknown>) : []
-
-  return [...new Set(['', ...BUILTIN_PERSONALITIES, ...customNames])]
+function personalityOptions(): string[] {
+  return ['', ...ASSISTANT_RESPONSE_STYLES]
 }
 
 // Built-in provider names, mirroring `tts_tool.py:BUILTIN_TTS_PROVIDERS` and
@@ -271,7 +266,7 @@ export function enumOptionsFor(
   config: HermesConfigRecord,
   dynamicOptions?: string[]
 ): string[] | undefined {
-  let opts = dynamicOptions ?? (key === 'display.personality' ? personalityOptions(config) : ENUM_OPTIONS[key])
+  let opts = dynamicOptions ?? (key === 'display.personality' ? personalityOptions() : ENUM_OPTIONS[key])
 
   // Merge in user-defined command-type providers so custom local TTS/STT
   // backends declared in config.yaml are selectable, not just the built-ins.

@@ -15,7 +15,6 @@ export const MESSAGING_ROUTE = '/messaging'
 export const WEBHOOKS_ROUTE = '/webhooks'
 export const ARTIFACTS_ROUTE = '/artifacts'
 export const CRON_ROUTE = '/cron'
-export const PROFILES_ROUTE = '/profiles'
 export const AGENTS_ROUTE = '/agents'
 export const STARMAP_ROUTE = '/starmap'
 
@@ -31,7 +30,6 @@ export type AppView =
   // session-title dropdown while a plugin page was showing.
   | 'extension'
   | 'messaging'
-  | 'profiles'
   | 'settings'
   | 'skills'
   | 'starmap'
@@ -44,7 +42,6 @@ export type AppRouteId =
   | 'cron'
   | 'messaging'
   | 'new'
-  | 'profiles'
   | 'settings'
   | 'skills'
   | 'starmap'
@@ -65,7 +62,6 @@ export const APP_ROUTES = [
   { id: 'webhooks', path: WEBHOOKS_ROUTE, view: 'webhooks' },
   { id: 'artifacts', path: ARTIFACTS_ROUTE, view: 'artifacts' },
   { id: 'cron', path: CRON_ROUTE, view: 'cron' },
-  { id: 'profiles', path: PROFILES_ROUTE, view: 'profiles' },
   { id: 'agents', path: AGENTS_ROUTE, view: 'agents' },
   { id: 'starmap', path: STARMAP_ROUTE, view: 'starmap' }
 ] as const satisfies readonly AppRoute[]
@@ -104,7 +100,7 @@ function isContributedPath(pathname: string): boolean {
 }
 
 // ── Contributed sidebar nav — the `sidebar.nav` registry area ────────────────
-// A DATA contribution adds a row to the sidebar's top nav (below Artifacts).
+// A DATA contribution adds a row to the sidebar's top nav (below Scheduled).
 // Pair with a ROUTES_AREA page: the row navigates to `path` and lights up
 // while the app is there.
 
@@ -126,7 +122,6 @@ export const OVERLAY_VIEWS: ReadonlySet<AppView> = new Set([
   'agents',
   'command-center',
   'cron',
-  'profiles',
   'settings',
   'starmap',
   'webhooks'

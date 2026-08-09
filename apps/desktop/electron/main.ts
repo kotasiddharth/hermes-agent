@@ -27,11 +27,13 @@ import {
   screen,
   session,
   shell,
-  systemPreferences
+  systemPreferences,
+  Tray
 } from 'electron'
 import nodePty from 'node-pty'
 
 import { classifyActiveRuntime } from './active-runtime-state'
+import { patchAppBehaviorSettings, sanitizeAppBehaviorSettings } from './app-behavior'
 import { stopBackendChild as stopBackendChildImpl } from './backend-child'
 import { dashboardFallbackArgs, sourceDeclaresServe } from './backend-command'
 import { createBackendConnectionState } from './backend-connection-state'
@@ -9034,6 +9036,89 @@ function closePetOverlay() {
   petOverlayWindow = null
 }
 
+// ── General desktop behavior ─────────────────────────────────────────────────
+//
+// General desktop behavior is main-process owned: it needs to take effect even
+// when the renderer is hidden (tray) or has not yet loaded (login startup).
+const APP_BEHAVIOR_CONFIG_PATH = path.join(app.getPath('userData'), 'app-behavior.json')
+let appBehaviorSettings = readAppBehaviorSettings()
+let appTray: Tray | null = null
+let isAppQuitting = false
+
+function readAppBehaviorSettings() {
+  try {
+    return sanitizeAppBehaviorSettings(JSON.parse(fs.readFileSync(APP_BEHAVIOR_CONFIG_PATH, 'utf8')))
+  } catch {
+    return sanitizeAppBehaviorSettings(undefined)
+  }
+}
+
+function writeAppBehaviorSettings(settings) {
+  try {
+    fs.mkdirSync(path.dirname(APP_BEHAVIOR_CONFIG_PATH), { recursive: true })
+    fs.writeFileSync(APP_BEHAVIOR_CONFIG_PATH, JSON.stringify(settings, null, 2), 'utf8')
+  } catch (error) {
+    rememberLog(`[app-behavior] write failed: ${error.message}`)
+  }
+}
+
+function launchOnStartupSupported() {
+  return IS_MAC || IS_WINDOWS
+}
+
+function appBehaviorState() {
+  return { ...appBehaviorSettings, launchOnStartupSupported: launchOnStartupSupported() }
+}
+
+function applyLaunchOnStartup(enabled) {
+  if (!launchOnStartupSupported()) {
+    return
+  }
+
+  app.setLoginItemSettings({ openAsHidden: enabled, openAtLogin: enabled })
+}
+
+function showMainWindowFromTray() {
+  if (!mainWindow || mainWindow.isDestroyed()) {
+    createWindow()
+
+    return
+  }
+
+  if (mainWindow.isMinimized()) {
+    mainWindow.restore()
+  }
+
+  mainWindow.show()
+  mainWindow.focus()
+}
+
+function ensureAppTray() {
+  if (!appBehaviorSettings.closeToTray) {
+    appTray?.destroy()
+    appTray = null
+
+    return
+  }
+
+  if (appTray && !appTray.isDestroyed()) {
+    return
+  }
+
+  const iconPath = getAppIconPath()
+  const icon = iconPath ? nativeImage.createFromPath(iconPath) : nativeImage.createEmpty()
+  appTray = new Tray(icon)
+  appTray.setToolTip('Hermes')
+  appTray.setContextMenu(
+    Menu.buildFromTemplate([
+      { click: showMainWindowFromTray, label: 'Open Hermes' },
+      { type: 'separator' },
+      { click: () => app.quit(), label: 'Quit' }
+    ])
+  )
+  appTray.on('click', showMainWindowFromTray)
+}
+
 // ── Quick Entry ─────────────────────────────────────────────────────────────
 //
 // A global shortcut summons a small frameless always-on-top composer from
@@ -9347,7 +9432,14 @@ function createWindow() {
   mainWindow.on('moved', schedulePersistWindowState)
   mainWindow.on('maximize', schedulePersistWindowState)
   mainWindow.on('unmaximize', schedulePersistWindowState)
-  mainWindow.on('close', () => schedulePersistWindowState.flush())
+  mainWindow.on('close', event => {
+    schedulePersistWindowState.flush()
+
+    if (appBehaviorSettings.closeToTray && !isAppQuitting) {
+      event.preventDefault()
+      mainWindow?.hide()
+    }
+  })
 
   // the closed wrapper remains truthy, so clear only the window this callback owns.
   const createdMainWindow = mainWindow
@@ -10681,6 +10773,27 @@ ipcMain.on('hermes:keep-awake', (_event, on) => {
   }
 })
 
+ipcMain.handle('hermes:app-behavior:get', async () => appBehaviorState())
+
+ipcMain.handle('hermes:app-behavior:set', async (_event, patch) => {
+  const next = patchAppBehaviorSettings(appBehaviorSettings, patch)
+
+  if (next.launchOnStartup !== appBehaviorSettings.launchOnStartup) {
+    try {
+      applyLaunchOnStartup(next.launchOnStartup)
+    } catch (error) {
+      rememberLog(`[app-behavior] could not update launch-on-startup: ${error.message}`)
+      throw new Error('Could not update launch on startup')
+    }
+  }
+
+  appBehaviorSettings = next
+  writeAppBehaviorSettings(next)
+  ensureAppTray()
+
+  return appBehaviorState()
+})
+
 // Quick Entry: the renderer reads the live registration state on settings mount
 // and writes the preference back. Main is authoritative — it owns the OS
 // accelerator — so both handlers return the state that ACTUALLY resulted,
@@ -11849,6 +11962,17 @@ app.whenReady().then(() => {
   configureSpellChecker()
   registerPowerResumeListeners()
   keepAwake.set(readPersistedKeepAwake())
+
+  // Restore OS-level app behavior before the first renderer frame. The tray is
+  // created only when requested, so it never adds an extra background icon for
+  // the default close-and-quit behavior.
+  try {
+    applyLaunchOnStartup(appBehaviorSettings.launchOnStartup)
+  } catch (error) {
+    rememberLog(`[app-behavior] could not restore launch-on-startup: ${error.message}`)
+  }
+
+  ensureAppTray()
   // Quick Entry's global chord — registered on ready so a cold launch restores
   // it without the renderer visiting Settings. A failed registration is logged
   // here and surfaced in Settings via the IPC state (never silent).
@@ -11880,7 +12004,7 @@ app.whenReady().then(() => {
     if (!mainWindow || mainWindow.isDestroyed()) {
       createWindow()
     } else {
-      focusWindow(mainWindow)
+      showMainWindowFromTray()
     }
   })
 })
@@ -11954,9 +12078,13 @@ function heldQuitForActiveWork(event: Electron.Event): boolean {
 }
 
 app.on('before-quit', event => {
+  isAppQuitting = true
+
   // Runs ahead of every teardown below, so "Keep Running" leaves the app
   // exactly as it was.
   if (heldQuitForActiveWork(event)) {
+    isAppQuitting = false
+
     return
   }
 
@@ -11993,6 +12121,8 @@ app.on('before-quit', event => {
   // pet can't keep the process alive or float over a quit app.
   closePetOverlay()
   wakeIndicatorController.close()
+  appTray?.destroy()
+  appTray = null
 
   // Same for the Quick Entry composer — and release its global accelerator so a
   // quitting Hermes never keeps another app's chord hostage.

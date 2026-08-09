@@ -224,6 +224,7 @@ export const ja = defineLocale({
     exportFailed: '書き出しに失敗しました',
     resetFailed: 'リセットに失敗しました',
     nav: {
+      general: 'General',
       providers: 'プロバイダー',
       providerAccounts: 'アカウント',
       providerApiKeys: 'API キー',
@@ -238,6 +239,22 @@ export const ja = defineLocale({
       about: '情報',
       billing: '請求',
       notifications: '通知'
+    },
+    general: {
+      title: 'General',
+      intro: 'Everyday desktop behavior for this computer.',
+      launchOnStartupTitle: 'Launch Hermes at sign-in',
+      launchOnStartupDesc: 'Start Hermes automatically when you sign in to your computer.',
+      launchOnStartupUnsupported: 'Launch at sign-in is available on Windows and macOS.',
+      closeToTrayTitle: 'Close to tray',
+      closeToTrayDesc: 'Keep Hermes running in the system tray when you close its window.',
+      hapticsTitle: '触覚フィードバック',
+      hapticsDesc: '対応するデバイスで、アプリ操作にさりげない触覚フィードバックを使います。',
+      desktopOnly: 'This setting is available in the Hermes desktop app.',
+      productivityTitle: 'Productivity',
+      productivityIntro: 'Helpful desktop behavior without changing how the AI responds.',
+      loadFailed: 'Could not load general settings',
+      saveFailed: 'Could not save general settings'
     },
     notifications: {
       title: '通知',
@@ -325,10 +342,16 @@ export const ja = defineLocale({
       terminalFontPlaceholder: 'MesloLGS NF または CSS フォントスタック',
       terminalFontPreview: 'グリフのプレビュー',
       terminalFontReset: '既定値を使用',
+      glassTitle: 'ガラス効果',
+      glassDesc: 'アプリのバー、メニュー、パネルにすりガラスの質感を加えます。応答性を保つため、ライブチャットはぼかしません。',
+      glassSolid: 'ソリッド',
+      glassSubtle: '控えめ',
+      glassFrosted: 'フロスト',
       translucencyTitle: 'ウィンドウの透過',
       translucencyDesc: 'ウィンドウ全体を透過させてデスクトップを表示します。macOS と Windows のみ。',
-      backdropTitle: 'チャット背景',
-      backdropDesc: '会話の背後に表示される淡い彫像の画像。',
+      translucencySolid: '不透明',
+      translucencySoft: '軽め',
+      translucencyClear: '強め',
       reactionsTitle: 'メッセージリアクション',
       reactionsDesc:
         'iMessage風の絵文字タップバック — メッセージにリアクションでき、Hermesもあなたのメッセージにリアクションします。',
@@ -900,6 +923,7 @@ export const ja = defineLocale({
       removedTitle: 'アカウントを削除しました',
       removedMessage: provider => `${provider} を削除しました。`,
       failedRemove: provider => `${provider} を削除できませんでした`,
+      noAccounts: '利用可能なサインインアカウントはありません。',
       noProviderKeys: '利用可能なプロバイダー API キーがありません。',
       searchKeys: 'プロバイダーを検索…',
       noKeysMatch: '一致するプロバイダーがありません。',
@@ -1071,7 +1095,23 @@ export const ja = defineLocale({
     edit: '編集',
     archive: 'アーカイブ',
     skillArchivedTitle: 'スキルをアーカイブしました',
-    skillArchivedMessage: 'hermes curator restore で復元できます。'
+    skillArchivedMessage: 'hermes curator restore で復元できます。',
+    hub: {
+      marketplaces: 'マイマーケットプレイス',
+      addMarketplace: 'マーケットプレイスを追加',
+      addingMarketplace: '追加中…',
+      removeMarketplace: '削除',
+      removingMarketplace: '削除中…',
+      githubRepository: 'GitHub リポジトリ',
+      githubRepositoryPlaceholder: 'https://github.com/owner/repository',
+      marketplaceDescription: 'skills フォルダーにスキルがある公開 GitHub リポジトリを追加します。',
+      marketplaceInvalid: 'GitHub リポジトリの URL または owner/repository を入力してください。',
+      marketplaceAdded: repo => `${repo} を追加しました`,
+      marketplaceAlreadyAdded: repo => `${repo} はすでに追加されています`,
+      marketplaceRemoved: repo => `${repo} を削除しました`,
+      marketplaceFailed: 'マーケットプレイスを追加できませんでした',
+      marketplaceRemoveFailed: 'マーケットプレイスを削除できませんでした'
+    }
   },
 
   starmap: {
@@ -1677,7 +1717,7 @@ export const ja = defineLocale({
       'new-session': '新しいセッション',
       skills: 'スキルとツール',
       messaging: 'メッセージング',
-      artifacts: 'アーティファクト'
+      scheduled: 'スケジュール'
     },
     searchAria: 'セッションを検索',
     searchPlaceholder: 'セッションを検索…',

@@ -40,7 +40,7 @@ function PopoverContent({
         // Themed glass surface, viewport-aware (Radix flips/shifts off edges),
         // standard open/close motion and the same soft shadow as menus.
         className={cn(
-          'z-50 w-72 origin-(--radix-popover-content-transform-origin) rounded-[var(--radius-md)] border border-(--ui-stroke-secondary) bg-[var(--popover-surface)] p-2 text-popover-foreground shadow-md backdrop-blur-md outline-hidden data-[side=bottom]:slide-in-from-top-1 data-[side=left]:slide-in-from-right-1 data-[side=right]:slide-in-from-left-1 data-[side=top]:slide-in-from-bottom-1 data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=closed]:zoom-out-95 data-[state=open]:animate-in data-[state=open]:fade-in-0 data-[state=open]:zoom-in-95 [--popover-surface:color-mix(in_srgb,var(--ui-bg-elevated)_92%,transparent)]',
+          'z-50 w-72 origin-(--radix-popover-content-transform-origin) rounded-[var(--radius-md)] border border-(--ui-stroke-secondary) bg-[var(--popover-surface)] p-2 text-popover-foreground shadow-md outline-hidden data-[side=bottom]:slide-in-from-top-1 data-[side=left]:slide-in-from-right-1 data-[side=right]:slide-in-from-left-1 data-[side=top]:slide-in-from-bottom-1 data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=closed]:zoom-out-95 data-[state=open]:animate-in data-[state=open]:fade-in-0 data-[state=open]:zoom-in-95 [--popover-surface:color-mix(in_srgb,var(--ui-bg-elevated)_var(--glass-elevated-opacity),transparent)]',
           className
         )}
         collisionPadding={collisionPadding}
@@ -56,7 +56,7 @@ function PopoverContent({
             The square's inner half tucks under the body, opening the border seam. */}
         <PopoverPrimitive.Arrow asChild height={7} width={16}>
           <span className="relative block h-[7px] w-4 overflow-visible">
-            <span className="absolute top-0 left-1/2 size-[11px] -translate-x-1/2 -translate-y-1/2 rotate-45 border-r border-b border-(--ui-stroke-secondary) bg-[var(--popover-surface)] backdrop-blur-md" />
+            <span className="glass-popover-arrow absolute top-0 left-1/2 size-[11px] -translate-x-1/2 -translate-y-1/2 rotate-45 border-r border-b border-(--ui-stroke-secondary)" />
           </span>
         </PopoverPrimitive.Arrow>
       </PopoverPrimitive.Content>

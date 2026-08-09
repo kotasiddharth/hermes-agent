@@ -288,6 +288,7 @@ export interface Translations {
     exportFailed: string
     resetFailed: string
     nav: {
+      general: string
       providers: string
       providerAccounts: string
       providerApiKeys: string
@@ -303,6 +304,22 @@ export interface Translations {
       billing: string
       notifications: string
       plugins: string
+    }
+    general: {
+      title: string
+      intro: string
+      launchOnStartupTitle: string
+      launchOnStartupDesc: string
+      launchOnStartupUnsupported: string
+      closeToTrayTitle: string
+      closeToTrayDesc: string
+      hapticsTitle: string
+      hapticsDesc: string
+      desktopOnly: string
+      productivityTitle: string
+      productivityIntro: string
+      loadFailed: string
+      saveFailed: string
     }
     plugins: {
       title: string
@@ -385,10 +402,16 @@ export interface Translations {
       terminalFontPlaceholder: string
       terminalFontPreview: string
       terminalFontReset: string
+      glassTitle: string
+      glassDesc: string
+      glassSolid: string
+      glassSubtle: string
+      glassFrosted: string
       translucencyTitle: string
       translucencyDesc: string
-      backdropTitle: string
-      backdropDesc: string
+      translucencySolid: string
+      translucencySoft: string
+      translucencyClear: string
       reactionsTitle: string
       reactionsDesc: string
       embedsTitle: string
@@ -769,6 +792,7 @@ export interface Translations {
       removedTitle: string
       removedMessage: (provider: string) => string
       failedRemove: (provider: string) => string
+      noAccounts: string
       noProviderKeys: string
       searchKeys: string
       noKeysMatch: string
@@ -953,13 +977,24 @@ export interface Translations {
       connectingHubs: string
       connectedHubs: string
       sources: string
+      marketplaces: string
+      addMarketplace: string
+      addingMarketplace: string
+      removeMarketplace: string
+      removingMarketplace: string
+      githubRepository: string
+      githubRepositoryPlaceholder: string
+      marketplaceDescription: string
+      marketplaceInvalid: string
+      marketplaceAdded: (repo: string) => string
+      marketplaceAlreadyAdded: (repo: string) => string
+      marketplaceRemoved: (repo: string) => string
+      marketplaceFailed: string
+      marketplaceRemoveFailed: string
       filterAll: string
       filterSkills: string
       filterIntegrations: string
-      installedTitle: string
-      installedCount: (count: number) => string
       skill: string
-      integration: string
       results: string
       integrationsTitle: string
       integrationsDescription: string

@@ -1,7 +1,6 @@
 import { ThreadPrimitive, useAuiEvent, useAuiState } from '@assistant-ui/react'
 import {
   type ComponentProps,
-  type CSSProperties,
   type FC,
   memo,
   type ReactNode,
@@ -103,9 +102,8 @@ interface ThreadMessageListProps {
   sessionKey?: string | null
 }
 
-// Group each user message with the assistant turn(s) that follow it so the
-// human bubble can `position: sticky` against the scroller across its whole
-// turn (see StickyHumanMessageContainer in thread.tsx).
+// Group each user message with the assistant turn(s) that follow it so a turn
+// remains intact when the render window pages older transcript content.
 export function buildGroups(signature: string): MessageGroup[] {
   if (!signature) {
     return []
@@ -263,7 +261,7 @@ const ThreadMessageListInner: FC<ThreadMessageListProps> = ({
   // escape on user scroll-up, re-lock at bottom. Snap instantly, not spring — a
   // spring can't tell live-token growth from a session-switch bulk relayout, and
   // chasing the latter reads as the view scrolling to random spots before
-  // settling. Its refs hang off our own DOM so the sticky human bubbles survive.
+  // settling. Its refs hang off our own DOM so edit/reflow state survives.
   const { scrollRef, contentRef, isAtBottom, scrollToBottom, stopScroll } = useStickToBottom({
     initial: 'instant',
     resize: 'instant',
@@ -392,13 +390,6 @@ const ThreadMessageListInner: FC<ThreadMessageListProps> = ({
   // hide the titlebar tool cluster + session header, but the OS traffic lights
   // still sit in the top-left, so reserve the titlebar gap above the transcript.
   const secondaryWindow = isSecondaryWindow()
-  // NB: CSS calc() requires whitespace around the +/- operator. This string is
-  // assigned verbatim to the --sticky-human-top inline style below (it does not
-  // go through Tailwind, which would auto-space it), so the spaces are load-
-  // bearing — without them the declaration is invalid, gets dropped, and the
-  // sticky user bubble falls back to its ~4px default and slides under the OS
-  // traffic lights.
-  const secondaryTitlebarGap = 'calc(var(--titlebar-height) + 0.75rem)'
 
   const threadContentTopPad = secondaryWindow
     ? 'pt-[calc(var(--titlebar-height)+0.75rem)]'
@@ -556,8 +547,8 @@ const ThreadMessageListInner: FC<ThreadMessageListProps> = ({
         // ~100-200ms with this on. contain-intrinsic-size keeps a
         // placeholder height for never-rendered turns (auto: remembered
         // real size once rendered), so scrollbar/anchoring stay stable.
-        // Sticky human bubbles are unaffected — their turn is rendered
-        // whenever any part of it intersects the viewport.
+        // Whole turns stay intact whenever any part of them intersects the
+        // viewport, so the conversational sequence never splits visually.
         //
         // The live tail (newest turns) is exempt: virtualizing a turn
         // whose final size hasn't been remembered yet snaps it to a stale
@@ -592,12 +583,7 @@ const ThreadMessageListInner: FC<ThreadMessageListProps> = ({
   return (
     <div
       className="relative min-h-0 max-w-full overflow-hidden contain-[layout_paint]"
-      style={
-        {
-          height: clampToComposer ? 'var(--thread-viewport-height)' : '100%',
-          ...(secondaryWindow ? { '--sticky-human-top': secondaryTitlebarGap } : {})
-        } as CSSProperties
-      }
+      style={{ height: clampToComposer ? 'var(--thread-viewport-height)' : '100%' }}
     >
       {secondaryWindow && (
         // Secondary windows hide the titlebar chrome, so the scroller runs to

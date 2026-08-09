@@ -5,14 +5,21 @@ import { cn } from '@/lib/utils'
  * `--composer-fill` var. The state ladder (rest / scrolled) lives in styles.css
  * on `[data-slot='composer-root']`, so the layers can never disagree.
  */
-export const composerFill = 'bg-(--composer-fill)'
+// Keep the main composer translucent without a backdrop filter: it sits over a
+// transcript that repaints while streaming, and blurring that moving content is
+// needlessly expensive. Menus and small floating pills can safely use blur.
+export const composerFill = 'glass-composer-surface'
 
-/** Backdrop treatment for the composer input surface. Harmless when the fill
- *  goes opaque (drawer open) — nothing shows through to blur. */
-export const composerSurfaceGlass = cn(
-  'backdrop-blur-[0.75rem] backdrop-saturate-[1.12] [-webkit-backdrop-filter:blur(0.75rem)_saturate(1.12)]',
+/** Backdrop treatment for short-lived composer menus. */
+export const composerPanelGlass = cn(
+  'glass-composer-panel',
   'transition-[background-color] duration-150 ease-out'
 )
+
+// The composer stays visible above a transcript that repaints for every
+// streamed token. Backdrop blur forces Chromium to resample that moving
+// surface, so retain the color transition but skip the per-frame blur work.
+export const composerSurfaceGlass = 'transition-[background-color] duration-150 ease-out'
 
 const composerDockEdge = (edge: 'bottom' | 'top') =>
   cn(
@@ -35,8 +42,7 @@ export const composerDockCard = (edge: 'bottom' | 'top' = 'top') =>
  *  of it. Visual skin only — consumers add their own size/position/padding. */
 export const composerPanelCard = cn(
   'rounded-[var(--composer-surface-radius)] border border-border/65 shadow-nous text-[length:var(--conversation-tool-font-size)]',
-  'bg-[color-mix(in_srgb,var(--dt-card)_72%,transparent)]',
-  composerSurfaceGlass
+  composerPanelGlass
 )
 
 /**
@@ -51,7 +57,7 @@ export const composerPanelCard = cn(
  */
 export const composerFloatingPill = cn(
   'inline-flex h-(--composer-control-size) shrink-0 cursor-pointer items-center gap-1.5 rounded-full px-2.5',
-  'border border-border/65 bg-(--composer-fill) backdrop-blur-[0.75rem] [-webkit-backdrop-filter:blur(0.75rem)]',
+  'glass-composer-pill border border-border/65',
   'text-xs font-normal text-(--ui-text-secondary) transition-colors',
   'hover:bg-(--chrome-action-hover) hover:text-foreground'
 )

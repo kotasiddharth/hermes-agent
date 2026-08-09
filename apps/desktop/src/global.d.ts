@@ -293,8 +293,8 @@ declare global {
       updates: {
         check: () => Promise<DesktopUpdateStatus>
         apply: (opts?: DesktopUpdateApplyOptions) => Promise<DesktopUpdateApplyResult>
-        getBranch: () => Promise<{ branch: string }>
-        setBranch: (name: string) => Promise<{ branch: string }>
+        getBranch: () => Promise<{ branch: string | null; channel: 'branch' | 'release' }>
+        setBranch: (name: string) => Promise<{ branch: string | null; channel: 'branch' | 'release' }>
         onProgress: (callback: (payload: DesktopUpdateProgress) => void) => () => void
       }
       uninstall: {

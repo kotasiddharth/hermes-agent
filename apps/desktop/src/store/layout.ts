@@ -339,6 +339,11 @@ export function togglePanesFlipped() {
   $panesFlipped.set(!$panesFlipped.get())
 }
 
+/** Set which side the sessions sidebar occupies without relying on a toggle. */
+export function setPanesFlipped(flipped: boolean) {
+  $panesFlipped.set(flipped)
+}
+
 export function selectRightRailTab(id: RightRailTabId | null) {
   $rightRailActiveTabId.set(id)
 }

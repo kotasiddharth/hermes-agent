@@ -21,7 +21,6 @@ import { $activeGatewayProfile } from '@/store/profile'
 import { toggleReview } from '@/store/review'
 import { $gatewayState } from '@/store/session'
 import { $threadScrolledUp } from '@/store/thread-scroll'
-import { $autoSpeakReplies } from '@/store/voice-prefs'
 import { useTheme } from '@/themes'
 
 import { ComposerApprovalMode } from './approval-mode'
@@ -146,7 +145,6 @@ export function ChatBar({
   const attachments = useStore(scope.attachments.$attachments)
   const compacting = useStore(useMemo(() => sessionCompacting(sessionId ?? null), [sessionId]))
   const scrolledUp = useStore($threadScrolledUp)
-  const autoSpeak = useStore($autoSpeakReplies)
   // The turn is parked on the user (clarify / approval / sudo / secret). Esc must
   // not interrupt it — there's nothing actively running to stop, and stopping
   // would discard a question the user may want to come back to. The blocking
@@ -893,7 +891,6 @@ export function ChatBar({
     conversation,
     dictate,
     endConversation,
-    handleToggleAutoSpeak,
     startConversation,
     voiceActivityState,
     voiceConversationActive,
@@ -932,7 +929,6 @@ export function ChatBar({
 
   const controls = (
     <ComposerControls
-      autoSpeak={autoSpeak}
       busy={busy}
       busyAction={busyAction}
       canSubmit={canSubmit}
@@ -951,7 +947,6 @@ export function ChatBar({
       hasComposerPayload={hasComposerPayload}
       onDictate={dictate}
       onQueue={queueDraft}
-      onToggleAutoSpeak={handleToggleAutoSpeak}
       state={state}
       voiceStatus={voiceStatus}
     />
@@ -1269,7 +1264,12 @@ export function ChatBar({
                         : 'grid-cols-[auto_1fr_auto] items-center gap-(--composer-control-gap) [grid-template-areas:"menu_input_controls"]'
                     )}
                   >
-                    <div className="flex translate-y-[3px] items-start gap-(--composer-control-gap) self-start [grid-area:menu]">
+                    <div
+                      className={cn(
+                        'flex gap-(--composer-control-gap) [grid-area:menu]',
+                        stacked ? 'items-center self-start pl-0.5' : 'translate-y-[3px] items-start self-start'
+                      )}
+                    >
                       {contextMenu}
                       {gateway && (
                         <ComposerApprovalMode

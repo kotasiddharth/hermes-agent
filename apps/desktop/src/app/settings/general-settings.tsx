@@ -5,6 +5,7 @@ import { useI18n } from '@/i18n'
 import { triggerHaptic } from '@/lib/haptics'
 import { $hapticsMuted, setHapticsMuted } from '@/store/haptics'
 import { $keepAwake, setKeepAwake } from '@/store/keep-awake'
+import { $panesFlipped, setPanesFlipped } from '@/store/layout'
 import { notifyError } from '@/store/notifications'
 
 import { SettingsContent, SettingsGroup, SettingsPageHeader, ToggleRow } from './primitives'
@@ -28,6 +29,7 @@ export function GeneralSettings() {
   const copy = t.settings.general
   const keepAwake = useStore($keepAwake)
   const hapticsMuted = useStore($hapticsMuted)
+  const panesFlipped = useStore($panesFlipped)
   const [appBehavior, setAppBehavior] = useState(DEFAULT_APP_BEHAVIOR)
   const [loading, setLoading] = useState(true)
   const [available, setAvailable] = useState(false)
@@ -78,10 +80,13 @@ export function GeneralSettings() {
     const previous = appBehavior
     setAppBehavior({ ...previous, ...patch })
 
-    void api.setAppBehavior(patch).then(setAppBehavior).catch(error => {
-      setAppBehavior(previous)
-      notifyError(error, copy.saveFailed)
-    })
+    void api
+      .setAppBehavior(patch)
+      .then(setAppBehavior)
+      .catch(error => {
+        setAppBehavior(previous)
+        notifyError(error, copy.saveFailed)
+      })
   }
 
   const desktopUnavailable = !available || loading
@@ -124,6 +129,12 @@ export function GeneralSettings() {
           description={copy.hapticsDesc}
           label={copy.hapticsTitle}
           onChange={setHapticsEnabled}
+        />
+        <ToggleRow
+          checked={panesFlipped}
+          description={copy.swapSidebarSidesDesc}
+          label={t.titlebar.swapSidebarSides}
+          onChange={setPanesFlipped}
         />
       </SettingsGroup>
 

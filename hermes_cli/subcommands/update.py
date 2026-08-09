@@ -53,12 +53,11 @@ def build_update_parser(subparsers, *, cmd_update: Callable) -> None:
     update_parser.add_argument(
         "--branch",
         default=None,
-        metavar="NAME",
+        metavar="REF",
         help=(
-            "Update against this branch instead of the default (main). "
-            "If the local checkout is on a different branch, hermes will "
-            "switch to the requested branch first (auto-stashing any "
-            "uncommitted changes)."
+            "Update against this branch or release tag instead of the default "
+            "(main). Release tags are checked out detached; branches are "
+            "switched normally after auto-stashing local changes."
         ),
     )
     update_parser.add_argument(

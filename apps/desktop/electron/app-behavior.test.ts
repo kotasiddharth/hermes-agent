@@ -1,10 +1,6 @@
 import { describe, expect, it } from 'vitest'
 
-import {
-  DEFAULT_APP_BEHAVIOR_SETTINGS,
-  patchAppBehaviorSettings,
-  sanitizeAppBehaviorSettings
-} from './app-behavior'
+import { DEFAULT_APP_BEHAVIOR_SETTINGS, patchAppBehaviorSettings, sanitizeAppBehaviorSettings } from './app-behavior'
 
 describe('app behavior settings', () => {
   it('uses safe defaults for missing or malformed persisted settings', () => {

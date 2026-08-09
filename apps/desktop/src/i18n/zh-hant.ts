@@ -1835,6 +1835,7 @@ export const zhHant = defineLocale({
     voiceDictation: '語音聽寫',
     speakReplies: '朗讀回覆',
     stopSpeakingReplies: '停止朗讀回覆',
+    wakeWord: '喚醒詞',
     wakeWordListening: phrase => `喚醒詞:「${phrase}」— 正在聆聽`,
     wakeWordOff: phrase => `喚醒詞:「${phrase}」— 已關閉`,
     wakeWordPausedVoice: phrase => `喚醒詞:「${phrase}」— 語音對話期間暫停`,

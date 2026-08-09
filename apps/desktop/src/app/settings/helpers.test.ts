@@ -21,7 +21,9 @@ describe('settings helpers', () => {
     const advanced = SECTIONS.find(section => section.id === 'advanced')
 
     expect(workspace?.keys).toEqual(['desktop.repo_scan_enabled'])
-    expect(advanced?.keys).toEqual(expect.arrayContaining(['desktop.repo_scan_roots', 'desktop.repo_scan_exclude_paths']))
+    expect(advanced?.keys).toEqual(
+      expect.arrayContaining(['desktop.repo_scan_roots', 'desktop.repo_scan_exclude_paths'])
+    )
     expect(fieldCopyForSchemaKey(FIELD_LABELS, 'desktop.repo_scan_enabled')).toBeTruthy()
     expect(fieldCopyForSchemaKey(FIELD_DESCRIPTIONS, 'desktop.repo_scan_exclude_paths')).toBeTruthy()
   })

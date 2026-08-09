@@ -326,7 +326,10 @@ const ActiveThreadTimeline: FC = () => {
       ref={rootRef}
       role="navigation"
     >
-      <div className="flex max-h-[min(40vh,14rem)] flex-col justify-center gap-1 py-1" data-slot="thread-timeline-ticks">
+      <div
+        className="flex max-h-[min(40vh,14rem)] flex-col justify-center gap-1 py-1"
+        data-slot="thread-timeline-ticks"
+      >
         {entries.map((entry, index) => (
           <button
             aria-current={index === activeIndex ? 'step' : undefined}

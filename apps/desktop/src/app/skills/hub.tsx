@@ -65,7 +65,10 @@ export function shortHubDescription(description: string): string {
     return normalized
   }
 
-  const sentenceEnd = Math.max(normalized.lastIndexOf('. ', HUB_DESCRIPTION_LIMIT), normalized.lastIndexOf('; ', HUB_DESCRIPTION_LIMIT))
+  const sentenceEnd = Math.max(
+    normalized.lastIndexOf('. ', HUB_DESCRIPTION_LIMIT),
+    normalized.lastIndexOf('; ', HUB_DESCRIPTION_LIMIT)
+  )
 
   const end = sentenceEnd >= Math.floor(HUB_DESCRIPTION_LIMIT * 0.6) ? sentenceEnd + 1 : HUB_DESCRIPTION_LIMIT
 
@@ -397,11 +400,11 @@ export function SkillsHub({ query }: SkillsHubProps) {
     <div className="flex h-full min-h-0 flex-col">
       <div className="min-h-0 flex-1 overflow-y-auto [scrollbar-gutter:stable]">
         <div className="mx-auto w-full max-w-[52rem] px-5 pb-20 pt-5">
-          <div className="mb-6 flex flex-wrap items-center justify-between gap-3">
+          <div className="mb-6 flex flex-col items-start gap-3">
             <div>
               <SegmentedControl onChange={setFilter} options={filterOptions} value={filter} />
             </div>
-            <div className="flex flex-wrap items-center justify-end gap-1.5 text-[0.6875rem] text-(--ui-text-tertiary)">
+            <div className="flex w-full flex-wrap items-center justify-start gap-1.5 text-[0.6875rem] text-(--ui-text-tertiary)">
               <span className="mr-0.5">{h.sources}</span>
               {sourcesQuery.isLoading ? (
                 <span>{h.connectingHubs}</span>
@@ -632,7 +635,10 @@ export function SkillsHub({ query }: SkillsHubProps) {
         </DialogContent>
       </Dialog>
 
-      <Dialog onOpenChange={open => (open ? setMarketplaceOpen(true) : closeMarketplaceDialog())} open={marketplaceOpen}>
+      <Dialog
+        onOpenChange={open => (open ? setMarketplaceOpen(true) : closeMarketplaceDialog())}
+        open={marketplaceOpen}
+      >
         <DialogContent className="max-w-md">
           <DialogHeader>
             <DialogTitle>{h.addMarketplace}</DialogTitle>
@@ -647,7 +653,11 @@ export function SkillsHub({ query }: SkillsHubProps) {
               placeholder={h.githubRepositoryPlaceholder}
               value={marketplaceRepo}
             />
-            {marketplaceError && <p className="text-xs text-destructive" role="alert">{marketplaceError}</p>}
+            {marketplaceError && (
+              <p className="text-xs text-destructive" role="alert">
+                {marketplaceError}
+              </p>
+            )}
             <DialogFooter>
               <Button onClick={closeMarketplaceDialog} size="sm" type="button" variant="text">
                 {h.close}

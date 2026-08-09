@@ -343,7 +343,8 @@ export const ja = defineLocale({
       terminalFontPreview: 'グリフのプレビュー',
       terminalFontReset: '既定値を使用',
       glassTitle: 'ガラス効果',
-      glassDesc: 'アプリのバー、メニュー、パネルにすりガラスの質感を加えます。応答性を保つため、ライブチャットはぼかしません。',
+      glassDesc:
+        'アプリのバー、メニュー、パネルにすりガラスの質感を加えます。応答性を保つため、ライブチャットはぼかしません。',
       glassSolid: 'ソリッド',
       glassSubtle: '控えめ',
       glassFrosted: 'フロスト',
@@ -1893,6 +1894,7 @@ export const ja = defineLocale({
     voiceDictation: '音声口述',
     speakReplies: '返信を読み上げる',
     stopSpeakingReplies: '返信の読み上げを停止',
+    wakeWord: 'ウェイクワード',
     wakeWordListening: phrase => `ウェイクワード:「${phrase}」— 待機中`,
     wakeWordOff: phrase => `ウェイクワード:「${phrase}」— オフ`,
     wakeWordPausedVoice: phrase => `ウェイクワード:「${phrase}」— 音声チャット中は一時停止`,

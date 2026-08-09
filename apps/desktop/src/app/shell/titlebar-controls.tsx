@@ -10,13 +10,7 @@ import { Tip, TipKeybindLabel } from '@/components/ui/tooltip'
 import { useI18n } from '@/i18n'
 import { triggerHaptic } from '@/lib/haptics'
 import { cn } from '@/lib/utils'
-import {
-  $fileBrowserOpen,
-  $sidebarOpen,
-  toggleFileBrowserOpen,
-  togglePanesFlipped,
-  toggleSidebarOpen
-} from '@/store/layout'
+import { $fileBrowserOpen, toggleFileBrowserOpen } from '@/store/layout'
 
 import { appViewForPath, isOverlayView } from '../routes'
 
@@ -99,39 +93,10 @@ export function TitlebarControls({ leftTools = [], tools = [], onOpenSettings }:
   const location = useLocation()
   const modHeld = useModifierHeld()
   const fileBrowserOpen = useStore($fileBrowserOpen)
-  const sidebarOpen = useStore($sidebarOpen)
 
-  // POSITIONAL toggles: each button shows/hides everything on its physical
-  // side of the main zone (the layout tree collapses the whole side), so they
-  // stay correct through flips and rearranges. $sidebarOpen ≙ left side,
-  // $fileBrowserOpen ≙ right side. Never an active highlight — plain
-  // show/hide affordances.
-  const leftEdge = { open: sidebarOpen, toggle: toggleSidebarOpen }
+  // This control shows or hides the physical right edge of the main zone, so
+  // it stays correct through layout flips and rearranges.
   const rightEdge = { open: fileBrowserOpen, toggle: toggleFileBrowserOpen }
-
-  const leftToolbarTools: TitlebarTool[] = [
-    {
-      actionId: 'view.toggleSidebar',
-      icon: <Codicon name="layout-sidebar-left" />,
-      id: 'sidebar',
-      label: leftEdge.open ? t.titlebar.hideSidebar : t.titlebar.showSidebar,
-      onSelect: () => {
-        triggerHaptic('tap')
-        leftEdge.toggle()
-      }
-    },
-    {
-      actionId: 'view.flipPanes',
-      icon: <Codicon name="arrow-swap" />,
-      id: 'flip-panes',
-      label: t.titlebar.swapSidebarSides,
-      onSelect: () => {
-        triggerHaptic('tap')
-        togglePanesFlipped()
-      }
-    },
-    ...leftTools
-  ]
 
   const rightSidebarTool: TitlebarTool = {
     actionId: 'view.toggleRightSidebar',
@@ -188,19 +153,20 @@ export function TitlebarControls({ leftTools = [], tools = [], onOpenSettings }:
 
   const visibleSystemTools = systemTools.filter(tool => !tool.hidden)
   const visiblePaneTools = tools.filter(tool => !tool.hidden)
+  const visibleLeftTools = leftTools.filter(tool => !tool.hidden)
 
   return (
     <>
-      <div
-        aria-label={t.shell.windowControls}
-        className="fixed left-(--titlebar-controls-left) top-(--titlebar-controls-top) z-70 flex translate-y-0.5 flex-row items-center gap-x-1 pointer-events-auto select-none [-webkit-app-region:no-drag]"
-      >
-        {leftToolbarTools
-          .filter(tool => !tool.hidden)
-          .map(tool => (
+      {visibleLeftTools.length > 0 && (
+        <div
+          aria-label={t.shell.windowControls}
+          className="fixed left-(--titlebar-controls-left) top-(--titlebar-controls-top) z-70 flex translate-y-0.5 flex-row items-center gap-x-1 pointer-events-auto select-none [-webkit-app-region:no-drag]"
+        >
+          {visibleLeftTools.map(tool => (
             <TitlebarToolButton key={tool.id} navigate={navigate} tool={tool} />
           ))}
-      </div>
+        </div>
+      )}
 
       {/*
         Pane-scoped tools (preview's monitor / devtools / refresh / X) render

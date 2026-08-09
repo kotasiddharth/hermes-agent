@@ -371,10 +371,7 @@ export function ChatSidebar({
 
   // Runtime workspaces stay invisible here: the session history is one flat
   // list, with any routing needed to resume a session handled in the background.
-  const visibleSessions = useMemo(
-    () => sessions,
-    [sessions]
-  )
+  const visibleSessions = useMemo(() => sessions, [sessions])
 
   // Recents by activity (last_active || started_at). User send stamps
   // last_active immediately; manual drag order still wins below.
@@ -1512,7 +1509,6 @@ export function ChatSidebar({
         )}
 
         {!showSessionSections && <SidebarBlankState onNewProject={openProjectCreate} />}
-
       </SidebarContent>
       <ProjectDialog />
       {/* One mount for the whole app. The header of WorktreeDialog tells why. */}

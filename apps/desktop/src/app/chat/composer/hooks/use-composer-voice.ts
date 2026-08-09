@@ -8,8 +8,8 @@ import { clearWakeIndicator, syncWakeIndicatorWithVoice } from '@/lib/wake-indic
 import { $voiceConversationStartRequest, takeVoiceConversationStart } from '@/store/composer'
 import { resetBrowseState } from '@/store/composer-input-history'
 import { $gateway } from '@/store/gateway'
-import { notify, notifyError } from '@/store/notifications'
-import { $autoSpeakReplies, $voiceStopPhrase, setAutoSpeakReplies } from '@/store/voice-prefs'
+import { notify } from '@/store/notifications'
+import { $voiceStopPhrase } from '@/store/voice-prefs'
 import { resumeWakeAfterVoice } from '@/store/wake-word'
 
 import type { ComposerTarget } from '../focus'
@@ -269,12 +269,6 @@ export function useComposerVoice({
     void conversation.end()
   }, [conversation])
 
-  const handleToggleAutoSpeak = useCallback(() => {
-    void setAutoSpeakReplies(!$autoSpeakReplies.get()).catch(error =>
-      notifyError(error, t.settings.config.autosaveFailed)
-    )
-  }, [t])
-
   useAutoSpeakReplies({
     conversationActive: voiceConversationActive,
     failureLabel: t.assistant.thread.readAloudFailed,
@@ -287,7 +281,6 @@ export function useComposerVoice({
     conversation,
     dictate,
     endConversation,
-    handleToggleAutoSpeak,
     startConversation,
     voiceActivityState,
     voiceConversationActive,

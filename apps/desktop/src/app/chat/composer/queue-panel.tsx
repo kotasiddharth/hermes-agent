@@ -1,5 +1,4 @@
 import { StatusRow } from '@/components/chat/status-row'
-import { StatusSection } from '@/components/chat/status-section'
 import { Button } from '@/components/ui/button'
 import { Codicon } from '@/components/ui/codicon'
 import { Tip } from '@/components/ui/tooltip'
@@ -42,13 +41,14 @@ export function QueuePanel({
   }
 
   return (
-    // Keyed on the park flag: StatusSection owns its collapse state from
-    // defaultCollapsed, so remount on park/unpark. A Stop must EXPAND the
-    // panel — the halted prompts' only presence is here, and leaving them
-    // behind a collapsed "N queued" pill is how they read as vanished.
-    <StatusSection
-      accessory={
-        parked ? (
+    <div className="space-y-0.5 px-1 py-1">
+      {/* A normal queue is self-explanatory from its message rows, so avoid a
+          second "N queued" heading. Only an explicitly parked queue needs a
+          status line, since it tells people why their messages are waiting. */}
+      {parked && (
+        <div className="flex items-center gap-1.5 px-1.5 py-1 text-[0.7rem] text-muted-foreground/85">
+          <Codicon className="shrink-0 text-muted-foreground/70" name="debug-pause" size="0.8rem" />
+          <span className="min-w-0 flex-1 truncate">{c.queuedPaused(entries.length)}</span>
           <Tip label={c.queueResumeTip}>
             <Button
               className="text-muted-foreground/75 hover:text-foreground/90"
@@ -60,13 +60,8 @@ export function QueuePanel({
               {c.queueResume}
             </Button>
           </Tip>
-        ) : undefined
-      }
-      defaultCollapsed={!parked}
-      icon={<Codicon className="text-muted-foreground/70" name={parked ? 'debug-pause' : 'layers'} size="0.8rem" />}
-      key={parked ? 'parked' : 'flowing'}
-      label={parked ? c.queuedPaused(entries.length) : c.queued(entries.length)}
-    >
+        </div>
+      )}
       {entries.map(entry => {
         const isEditing = editingId === entry.id
         const attachmentsCount = entry.attachments.length
@@ -74,23 +69,26 @@ export function QueuePanel({
         return (
           <StatusRow
             className={cn(
-              'border border-transparent',
-              isEditing && 'border-[color-mix(in_srgb,var(--dt-composer-ring)_40%,transparent)] bg-accent/25'
+              'border border-transparent px-1.5',
+              isEditing &&
+                'border-[color-mix(in_srgb,var(--dt-composer-ring)_45%,transparent)] bg-accent/20 shadow-[inset_0_0_0_1px_color-mix(in_srgb,var(--dt-composer-ring)_18%,transparent)]'
             )}
             key={entry.id}
+            leading={<CornerDownLeft className="size-3 text-muted-foreground/70" />}
             trailing={
               <>
                 <Tip label={c.queueEdit}>
                   <Button
                     aria-label={c.queueEdit}
-                    className="size-5 rounded-md"
+                    className="h-5 gap-1 px-1 text-[0.6875rem] text-muted-foreground/85 hover:text-foreground/95"
                     disabled={Boolean(editingId) && !isEditing}
                     onClick={() => onEdit(entry)}
-                    size="icon-xs"
+                    size="micro"
                     type="button"
-                    variant="ghost"
+                    variant="text"
                   >
                     <Pencil className={iconSize.xs} />
+                    <span>{c.queueEdit}</span>
                   </Button>
                 </Tip>
                 <Tip label={busy ? c.queueSendNext : c.queueSend}>
@@ -120,7 +118,7 @@ export function QueuePanel({
                 </Tip>
               </>
             }
-            trailingVisible={isEditing}
+            trailingVisible
           >
             <div className="min-w-0 flex-1">
               <p className="truncate text-[0.73rem] leading-4 text-foreground/92">{entryPreview(entry, c)}</p>
@@ -138,6 +136,6 @@ export function QueuePanel({
           </StatusRow>
         )
       })}
-    </StatusSection>
+    </div>
   )
 }

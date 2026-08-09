@@ -62,7 +62,6 @@ function compactDescription(description: string): string {
     return normalized
   }
 
-
   return `${normalized.slice(0, COMPACT_DESCRIPTION_LIMIT).trimEnd()}…`
 }
 
@@ -170,7 +169,6 @@ export function IntegrationsCatalog({
       : googleConnected
         ? p.googleWorkspaceConnected
         : p.googleWorkspaceConnect
-
 
   const readyCount =
     entries.filter(entry => entry.installed && entry.enabled && entry.authenticated !== false).length +
@@ -341,7 +339,9 @@ export function IntegrationsCatalog({
           {googleActionLabel}
         </Button>
       }
-      description={compactDescriptions ? compactDescription(p.googleWorkspaceDescription) : p.googleWorkspaceDescription}
+      description={
+        compactDescriptions ? compactDescription(p.googleWorkspaceDescription) : p.googleWorkspaceDescription
+      }
       title={p.googleWorkspaceTitle}
     />
   ) : null

@@ -149,10 +149,13 @@ export function OverlayView({
 
           <Button
             aria-label={closeLabel}
-            className="pointer-events-auto absolute right-3 top-[calc(0.1875rem+var(--titlebar-height)/2)] -translate-y-1/2 text-(--ui-text-tertiary) hover:bg-(--chrome-action-hover) hover:text-foreground [-webkit-app-region:no-drag]"
+            // Keep the same icon center (right-3 + 20px control) while giving
+            // the floating X a full 28px hit target. The former titlebar-sized
+            // 20×22px box made clicks near the visible close affordance miss.
+            className="pointer-events-auto absolute right-2 top-[calc(0.1875rem+var(--titlebar-height)/2)] size-7 -translate-y-1/2 text-(--ui-text-tertiary) hover:bg-(--chrome-action-hover) hover:text-foreground [-webkit-app-region:no-drag]"
             motion="none"
             onClick={closeOverlay}
-            size="icon-titlebar"
+            size="icon"
             variant="ghost"
           >
             <Codicon name="close" size="1rem" />

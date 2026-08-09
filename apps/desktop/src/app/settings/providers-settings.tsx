@@ -3,13 +3,7 @@ import type { ReactNode } from 'react'
 import { useCallback, useEffect, useMemo, useState } from 'react'
 
 import { runInTerminal } from '@/app/right-sidebar/store'
-import {
-  FEATURED_ID,
-  FeaturedProviderRow,
-  ProviderRow,
-  providerTitle,
-  sortProviders
-} from '@/components/onboarding'
+import { FEATURED_ID, FeaturedProviderRow, ProviderRow, providerTitle, sortProviders } from '@/components/onboarding'
 import { Button } from '@/components/ui/button'
 import { RowButton } from '@/components/ui/row-button'
 import { SearchField } from '@/components/ui/search-field'
@@ -313,12 +307,7 @@ function LocalEndpointRow({ onOpen }: { onOpen: (reason: null | string) => void 
   )
 }
 
-export function ProvidersSettings({
-  onClose,
-  onConfigSaved,
-  onMainModelChanged,
-  view
-}: ProvidersSettingsProps) {
+export function ProvidersSettings({ onClose, onConfigSaved, onMainModelChanged, view }: ProvidersSettingsProps) {
   const { t } = useI18n()
   const { rowProps, vars } = useEnvCredentials()
   const [oauthProviders, setOauthProviders] = useState<OAuthProvider[]>([])

@@ -3,6 +3,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 import { $hapticsMuted } from '@/store/haptics'
 import { $keepAwake } from '@/store/keep-awake'
+import { $panesFlipped } from '@/store/layout'
 
 import { GeneralSettings } from './general-settings'
 
@@ -25,6 +26,7 @@ vi.mock('@/i18n', () => ({
           closeToTrayTitle: 'Close to tray',
           hapticsDesc: 'Use subtle tactile feedback for app actions when your device supports it.',
           hapticsTitle: 'Haptic feedback',
+          swapSidebarSidesDesc: 'Put the sessions sidebar on the right and the workspace panes on the left.',
           desktopOnly: 'This setting is available in the Hermes desktop app.',
           intro: 'Everyday desktop behavior for this computer.',
           launchOnStartupDesc: 'Start Hermes automatically when you sign in to your computer.',
@@ -45,6 +47,9 @@ vi.mock('@/i18n', () => ({
           shortcutTitle: '',
           takenBy: ''
         }
+      },
+      titlebar: {
+        swapSidebarSides: 'Swap sidebar sides'
       }
     }
   })
@@ -72,6 +77,7 @@ describe('GeneralSettings', () => {
   beforeEach(() => {
     $hapticsMuted.set(false)
     $keepAwake.set(false)
+    $panesFlipped.set(false)
     mocks.getAppBehavior.mockResolvedValue({
       closeToTray: false,
       launchOnStartup: true,
@@ -89,6 +95,7 @@ describe('GeneralSettings', () => {
     cleanup()
     vi.clearAllMocks()
     $hapticsMuted.set(false)
+    $panesFlipped.set(false)
     Object.defineProperty(window, 'hermesDesktop', { configurable: true, value: originalDesktop })
   })
 
@@ -141,5 +148,21 @@ describe('GeneralSettings', () => {
 
     expect($hapticsMuted.get()).toBe(true)
     expect(haptics.getAttribute('data-state')).toBe('unchecked')
+  })
+
+  it('moves the sidebar-side preference into General settings', async () => {
+    await act(async () => {
+      render(<GeneralSettings />)
+    })
+
+    const swapSides = await screen.findByRole('switch', { name: 'Swap sidebar sides' })
+    expect(swapSides.getAttribute('data-state')).toBe('unchecked')
+
+    await act(async () => {
+      fireEvent.click(swapSides)
+    })
+
+    expect($panesFlipped.get()).toBe(true)
+    expect(swapSides.getAttribute('data-state')).toBe('checked')
   })
 })

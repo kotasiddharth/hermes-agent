@@ -6,6 +6,7 @@ import { useSearchParams } from 'react-router'
 
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
+import { Switch } from '@/components/ui/switch'
 import { getElevenLabsVoices, getHermesConfigSchema, saveHermesConfig } from '@/hermes'
 import { useI18n } from '@/i18n'
 import { triggerHaptic } from '@/lib/haptics'
@@ -20,6 +21,8 @@ import {
 } from '@/store/data-url-read-max'
 import { notify, notifyError } from '@/store/notifications'
 import { repoDiscoveryPolicyFromConfig, repoDiscoveryPolicySignature, scanAndRecordRepos } from '@/store/projects'
+import { applyAutoSpeakFromConfig } from '@/store/voice-prefs'
+import { $wakeWord, setWakeWordEnabled } from '@/store/wake-word'
 import type { ConfigFieldSchema, HermesConfigRecord } from '@/types/hermes'
 
 import { setHermesConfigCache, useHermesConfigRecord } from '../hooks/use-config-record'
@@ -32,14 +35,7 @@ import { enumOptionsFor, getNested, isExternalMemoryProvider, sectionFieldEntrie
 import { MemoryConnect } from './memory/connect'
 import { ProviderConfigPanel } from './memory/provider-config-panel'
 import { ModelSettings, ModelSettingsSkeleton } from './model-settings'
-import {
-  EmptyState,
-  ListRow,
-  SettingsContent,
-  SettingsGroup,
-  SettingsPageHeader,
-  SettingsSkeleton
-} from './primitives'
+import { EmptyState, ListRow, SettingsContent, SettingsGroup, SettingsPageHeader, SettingsSkeleton } from './primitives'
 
 // On the Voice page, only surface the sub-fields of the *selected* TTS/STT
 // provider — otherwise every provider's options render at once (the "totally
@@ -317,6 +313,7 @@ export function ConfigSettings({
           deliberately advanced: changing a raw memory limit should not be part
           of the everyday chat setup. */}
       {activeSectionId === 'advanced' ? <AttachmentSizeSetting /> : null}
+      {activeSectionId === 'voice' ? <WakeWordSetting /> : null}
       {visibleFields.length === 0 && activeSectionId !== 'chat' && activeSectionId !== 'model' ? (
         <EmptyState description={c.emptyDesc} title={c.emptyTitle} />
       ) : visibleFields.length === 0 ? null : (
@@ -334,7 +331,18 @@ export function ConfigSettings({
                     ? enumOptionsFor(key, getNested(config, key), config, elevenLabsVoiceOptions ?? undefined)
                     : enumOptionsFor(key, getNested(config, key), config)
                 }
-                onChange={value => updateConfig(setNested(config, key, value))}
+                onChange={value => {
+                  const nextConfig = setNested(config, key, value)
+
+                  // Auto-speak is consumed live by an open chat composer, so
+                  // update its atom with the draft rather than making the user
+                  // wait for a settings reload after this switch changes.
+                  if (key === 'voice.auto_tts') {
+                    applyAutoSpeakFromConfig(nextConfig)
+                  }
+
+                  updateConfig(nextConfig)
+                }}
                 optionLabels={
                   key === 'display.personality'
                     ? ASSISTANT_RESPONSE_STYLE_LABELS
@@ -361,6 +369,35 @@ export function ConfigSettings({
         type="file"
       />
     </SettingsContent>
+  )
+}
+
+/** Desktop-only passive voice activation belongs beside the other voice preferences. */
+function WakeWordSetting() {
+  const { t } = useI18n()
+  const wake = useStore($wakeWord)
+  const phrase = wake.phrase || 'hey hermes'
+  const enabled = wake.enabled || wake.listening
+  const status = wake.listening ? t.composer.wakeWordListening(phrase) : t.composer.wakeWordOff(phrase)
+
+  return (
+    <SettingsGroup className="mb-5">
+      <ListRow
+        action={
+          <Switch
+            aria-label={t.composer.wakeWord}
+            checked={enabled}
+            disabled={wake.pending}
+            onCheckedChange={next => {
+              triggerHaptic('selection')
+              void setWakeWordEnabled(next)
+            }}
+          />
+        }
+        description={wake.notice ? `${status} — ${wake.notice}` : status}
+        title={t.composer.wakeWord}
+      />
+    </SettingsGroup>
   )
 }
 

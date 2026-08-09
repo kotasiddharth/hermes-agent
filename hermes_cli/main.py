@@ -9079,7 +9079,7 @@ def _finalize_update_output(state):
 
 
 def _resolve_update_branch(args) -> str:
-    """Normalize ``args.branch`` into a non-empty branch name.
+    """Normalize ``args.branch`` into a non-empty branch or release-tag ref.
 
     Centralizes the "default to main, accept --branch override, treat empty
     or whitespace-only values as the default" parsing so every consumer of

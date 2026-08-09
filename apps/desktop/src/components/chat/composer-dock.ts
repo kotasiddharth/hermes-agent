@@ -11,10 +11,7 @@ import { cn } from '@/lib/utils'
 export const composerFill = 'glass-composer-surface'
 
 /** Backdrop treatment for short-lived composer menus. */
-export const composerPanelGlass = cn(
-  'glass-composer-panel',
-  'transition-[background-color] duration-150 ease-out'
-)
+export const composerPanelGlass = cn('glass-composer-panel', 'transition-[background-color] duration-150 ease-out')
 
 // The composer stays visible above a transcript that repaints for every
 // streamed token. Backdrop blur forces Chromium to resample that moving

@@ -3,7 +3,6 @@ import { afterEach, describe, expect, it, vi } from 'vitest'
 
 import type { ChatBarState } from '@/app/chat/composer/types'
 import { I18nProvider } from '@/i18n'
-import { applyWakeStartResult, applyWakeStatus, resetWakeWordState } from '@/store/wake-word'
 
 import { ComposerControls } from './controls'
 
@@ -19,7 +18,6 @@ function renderControls(overrides: Partial<React.ComponentProps<typeof ComposerC
   return render(
     <I18nProvider configClient={null} initialLocale="en">
       <ComposerControls
-        autoSpeak={false}
         busy={false}
         busyAction="stop"
         canSubmit={true}
@@ -37,7 +35,6 @@ function renderControls(overrides: Partial<React.ComponentProps<typeof ComposerC
         hasComposerPayload={true}
         onDictate={vi.fn()}
         onQueue={vi.fn()}
-        onToggleAutoSpeak={vi.fn()}
         state={state}
         voiceStatus="idle"
         {...overrides}
@@ -79,61 +76,11 @@ describe('ComposerControls shortcut tooltips', () => {
   })
 })
 
-describe('wake-word ear visibility', () => {
-  afterEach(() => {
-    resetWakeWordState()
-  })
-
-  it('stays mounted during a busy agent turn', () => {
-    applyWakeStatus({ available: true, enabled: true, listening: true, phrase: 'hey hermes' })
-    renderControls({ busy: true, busyAction: 'stop' })
-
-    expect(screen.getByLabelText('Wake word: "hey hermes" — listening')).toBeTruthy()
-  })
-
-  it('stays mounted (enabled in config) even when a start was refused', () => {
-    applyWakeStatus({ available: true, enabled: true, listening: false, phrase: 'hey hermes' })
-    // Transient refusal marks available false but enabled keeps it mounted.
-    applyWakeStartResult({ hint: 'mic busy', reason: 'unavailable', started: false })
+describe('voice preferences', () => {
+  it('keeps persistent voice preferences out of the composer', () => {
     renderControls()
 
-    expect(screen.getByLabelText('Wake word: "hey hermes" — off')).toBeTruthy()
-  })
-
-  it('stays visible (never hides) even when unavailable and not enabled', () => {
-    applyWakeStatus({ available: false, enabled: false, listening: false, phrase: 'hey hermes' })
-    renderControls()
-
-    // The ear ALWAYS shows so the user can click to enable; a failed start
-    // surfaces its reason in the tooltip rather than hiding the control.
-    expect(screen.getByLabelText('Wake word: "hey hermes" — off')).toBeTruthy()
-  })
-
-  it('surfaces the backend refusal reason in the tooltip, still visible', () => {
-    applyWakeStatus({ available: false, enabled: false, listening: false, phrase: 'hey hermes' })
-    applyWakeStartResult({ hint: 'run `hermes tools` (Voice section)', reason: 'unavailable', started: false })
-    renderControls()
-
-    const ear = screen.getByLabelText('Wake word: "hey hermes" — off')
-    expect(ear).toBeTruthy()
-  })
-
-  it('shows a disabled paused ear inside the voice-conversation pill', () => {
-    applyWakeStatus({ available: true, enabled: true, listening: true, phrase: 'hey hermes' })
-    renderControls({
-      conversation: {
-        active: true,
-        level: 0,
-        muted: false,
-        onEnd: vi.fn(),
-        onStart: vi.fn(),
-        onStopTurn: vi.fn(),
-        onToggleMute: vi.fn(),
-        status: 'listening'
-      }
-    })
-
-    const ear = screen.getByLabelText('Wake word: "hey hermes" — paused during voice chat')
-    expect((ear as HTMLButtonElement).disabled).toBe(true)
+    expect(screen.queryByRole('button', { name: /read replies aloud/i })).toBeNull()
+    expect(screen.queryByRole('button', { name: /wake word/i })).toBeNull()
   })
 })

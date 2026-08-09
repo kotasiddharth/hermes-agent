@@ -210,6 +210,11 @@ export function TreeGroup({
   const activeId = shown.includes(node.active) ? node.active : (shown[0] ?? node.active)
   const active = paneFor(activeId)
   const isEmpty = node.panes.length === 0
+  // Sessions is the app's permanent navigation rail, not an inset card.  The
+  // workspace needs the rounded, inset edge to establish where a conversation
+  // begins; rounding the navigation rail instead makes that boundary look
+  // backwards (and leaves its right edge floating in the window).
+  const isSessionsRail = activeId === 'sessions'
 
   // KEEP-ALIVE: every pane that has been ACTIVE in this zone stays mounted —
   // an inactive tab merely hides (visibility), it does not unmount. Remounting
@@ -334,7 +339,10 @@ export function TreeGroup({
 
   return (
     <div
-      className="relative m-1.5 flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden rounded-[var(--radius-xl)] bg-(--ui-editor-surface-background)"
+      className={cn(
+        'relative flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden bg-(--ui-editor-surface-background)',
+        isSessionsRail ? 'm-0 rounded-none' : 'm-1.5 rounded-[var(--radius-xl)]'
+      )}
       data-tree-group={node.id}
       // Advertises the visible tab strip so panes can drop their own
       // self-naming labels (see [data-pane-self-label] in styles.css).

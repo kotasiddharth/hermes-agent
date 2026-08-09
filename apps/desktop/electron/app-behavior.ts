@@ -24,10 +24,7 @@ export function sanitizeAppBehaviorSettings(raw: unknown): AppBehaviorSettings {
   }
 }
 
-export function patchAppBehaviorSettings(
-  current: AppBehaviorSettings,
-  patch: unknown
-): AppBehaviorSettings {
+export function patchAppBehaviorSettings(current: AppBehaviorSettings, patch: unknown): AppBehaviorSettings {
   const record = patch && typeof patch === 'object' ? (patch as Record<string, unknown>) : {}
 
   return {

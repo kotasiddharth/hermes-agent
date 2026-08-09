@@ -3,7 +3,7 @@ import { atom } from 'nanostores'
 import { type ClientWakeCaptureHandle, startClientWakeCapture } from '@/lib/wake-client-capture'
 import { $gateway } from '@/store/gateway'
 
-// "Hey Hermes" wake-word listener state for the composer toggle. The gateway is
+// "Hey Hermes" wake-word listener state for the Voice setting. The gateway is
 // the single source of truth (the listener lives in the backend and is shared
 // with the TUI under a single-owner mic lease); this atom is the renderer's
 // cache of that truth, refreshed from every wake.* RPC response we see.
@@ -285,11 +285,11 @@ export async function armWakeWord(request: WakeRequester = gatewayRequester): Pr
   }
 }
 
-/** The composer button's click handler: stop when listening, start otherwise. */
-export async function toggleWakeWord(request: WakeRequester = gatewayRequester): Promise<void> {
+/** Persist the desired wake-word setting and synchronize its runtime listener. */
+export async function setWakeWordEnabled(enabled: boolean, request: WakeRequester = gatewayRequester): Promise<void> {
   const state = $wakeWord.get()
 
-  if (state.pending) {
+  if (state.pending || enabled === (state.enabled || state.listening)) {
     return
   }
 
@@ -297,12 +297,12 @@ export async function toggleWakeWord(request: WakeRequester = gatewayRequester):
     ...state,
     // First arm may lazy-install the detection engine — say so instead of
     // freezing a silent disabled button for the duration.
-    notice: state.listening ? '' : 'arming — first use may take a minute while the engine installs',
+    notice: enabled ? 'arming — first use may take a minute while the engine installs' : '',
     pending: true
   })
 
   try {
-    if (state.listening) {
+    if (!enabled) {
       applyWakeStopResult(await request<WakeStopResponse>('wake.stop', { persist: true }))
     } else {
       // persist: true — a deliberate click is consent, so the backend flips
@@ -325,6 +325,13 @@ export async function toggleWakeWord(request: WakeRequester = gatewayRequester):
       pending: false
     })
   }
+}
+
+/** Toggle helper retained for keyboard and command surfaces. */
+export async function toggleWakeWord(request: WakeRequester = gatewayRequester): Promise<void> {
+  const state = $wakeWord.get()
+
+  await setWakeWordEnabled(!(state.enabled || state.listening), request)
 }
 
 const sleep = (ms: number) => new Promise<void>(resolve => setTimeout(resolve, ms))

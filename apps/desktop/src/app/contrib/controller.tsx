@@ -294,7 +294,7 @@ registry.registerMany([
       keywords: ['keybinds', 'shortcuts', 'hotkeys', 'keyboard'],
       run: () => window.dispatchEvent(new CustomEvent('hermes:open-keybinds'))
     } satisfies PaletteContribution
-  },
+  }
 ])
 
 // ---------------------------------------------------------------------------

@@ -228,13 +228,7 @@ export const PROVIDER_GROUPS: ProviderPrefix[] = [
 // The response style is a small set of intentional, predictable choices. It
 // replaces profile-authored personas in Settings without exposing runtime
 // instruction files or custom prompt internals.
-export const ASSISTANT_RESPONSE_STYLES = [
-  'helpful',
-  'concise',
-  'technical',
-  'creative',
-  'teacher'
-]
+export const ASSISTANT_RESPONSE_STYLES = ['helpful', 'concise', 'technical', 'creative', 'teacher']
 
 export const ASSISTANT_RESPONSE_STYLE_LABELS: Record<string, string> = {
   helpful: 'Kind & helpful',
@@ -668,20 +662,13 @@ export const SECTIONS: DesktopConfigSection[] = [
     id: 'safety',
     label: 'Safety',
     icon: Lock,
-    keys: [
-      'approvals.mode',
-      'security.redact_secrets',
-      'checkpoints.enabled'
-    ]
+    keys: ['approvals.mode', 'security.redact_secrets', 'checkpoints.enabled']
   },
   {
     id: 'memory',
     label: 'Memory & Context',
     icon: Brain,
-    keys: [
-      'memory.memory_enabled',
-      'memory.user_profile_enabled'
-    ]
+    keys: ['memory.memory_enabled', 'memory.user_profile_enabled']
   },
   {
     id: 'voice',

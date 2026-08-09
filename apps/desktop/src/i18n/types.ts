@@ -315,6 +315,7 @@ export interface Translations {
       closeToTrayDesc: string
       hapticsTitle: string
       hapticsDesc: string
+      swapSidebarSidesDesc: string
       desktopOnly: string
       productivityTitle: string
       productivityIntro: string
@@ -1785,6 +1786,7 @@ export interface Translations {
     voiceDictation: string
     speakReplies: string
     stopSpeakingReplies: string
+    wakeWord: string
     wakeWordListening: (phrase: string) => string
     wakeWordOff: (phrase: string) => string
     wakeWordPausedVoice: (phrase: string) => string

@@ -108,14 +108,17 @@ def _(rid, params: dict) -> dict:
 @method("projects.tree")
 def _(rid, params: dict) -> dict:
     """Authoritative project overview: project -> repo -> lane structure with
-    counts + a few preview sessions per project, plus the flat set of session
-    ids claimed by any project (so the desktop excludes them from flat Recents).
-    Lanes carry no session rows here; drill-in uses ``projects.project_sessions``.
+    counts + a few preview sessions per project, plus exact membership for
+    actual projects and the legacy all-tree id set used for tombstones. Lanes
+    carry no session rows here; drill-in uses ``projects.project_sessions``.
     """
     try:
         db = _get_db()
         if db is None:
-            return _ok(rid, {"projects": [], "active_id": None, "scoped_session_ids": []})
+            return _ok(
+                rid,
+                {"projects": [], "active_id": None, "project_session_owners": {}, "scoped_session_ids": []},
+            )
 
         tree, active_id = _build_project_tree(
             db,
@@ -126,7 +129,12 @@ def _(rid, params: dict) -> dict:
         )
         return _ok(
             rid,
-            {"projects": tree["projects"], "active_id": active_id, "scoped_session_ids": tree["scoped_session_ids"]},
+            {
+                "projects": tree["projects"],
+                "active_id": active_id,
+                "project_session_owners": tree["project_session_owners"],
+                "scoped_session_ids": tree["scoped_session_ids"],
+            },
         )
     except Exception as e:
         return _err(rid, 5061, str(e))

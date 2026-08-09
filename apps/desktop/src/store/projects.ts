@@ -41,6 +41,10 @@ export const $activeProjectId = atom<null | string>(null)
 // fetched lazily on drill-in via `fetchProjectSessions`. This is the single
 // source of project membership — the desktop no longer derives it.
 export const $projectTree = atom<SidebarProjectTree[]>([])
+// Exact owners for sessions in explicit or auto projects (not the synthetic
+// Home bucket). Recents uses this to stay disjoint from visible Projects while
+// still keeping chats from a dismissed project accessible.
+export const $projectSessionOwners = atom<Record<string, string>>({})
 export const $projectTreeLoading = atom(false)
 
 // False when the connected backend predates the projects.* JSON-RPC surface
@@ -444,6 +448,7 @@ export async function refreshProjects(): Promise<void> {
 interface ProjectTreePayload {
   projects: SidebarProjectTree[]
   active_id: null | string
+  project_session_owners?: Record<string, string>
   scoped_session_ids: string[]
 }
 
@@ -467,6 +472,7 @@ async function refreshProjectTreeOn(gateway: HermesGateway): Promise<void> {
 
     const scoped = new Set(res.scoped_session_ids ?? [])
     $projectTree.set(res.projects ?? [])
+    $projectSessionOwners.set(res.project_session_owners ?? {})
     $activeProjectId.set(res.active_id ?? null)
     const tombstones = $removedSessionIds.get()
 

@@ -2126,6 +2126,7 @@ export const zh: Translations = {
     noMatch: query => `没有会话匹配"${query}"。`,
     results: '结果',
     pinned: '已置顶',
+    recents: '最近',
     sessions: '会话',
     cronJobs: '定时任务',
     groupAriaGrouped: '以单一列表显示会话',

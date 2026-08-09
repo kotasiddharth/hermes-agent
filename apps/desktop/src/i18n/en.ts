@@ -1933,6 +1933,7 @@ export const en: Translations = {
     noMatch: query => `No sessions match “${query}”.`,
     results: 'Results',
     pinned: 'Pinned',
+    recents: 'Recents',
     sessions: 'Sessions',
     cronJobs: 'Cron jobs',
     groupAriaGrouped: 'Show sessions as a single list',

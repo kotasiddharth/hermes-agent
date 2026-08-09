@@ -1627,6 +1627,7 @@ export interface Translations {
     noMatch: (query: string) => string
     results: string
     pinned: string
+    recents: string
     sessions: string
     cronJobs: string
     groupAriaGrouped: string

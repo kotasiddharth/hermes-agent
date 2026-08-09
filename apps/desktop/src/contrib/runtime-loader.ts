@@ -191,6 +191,19 @@ export async function loadRuntimePlugin(
 // ---------------------------------------------------------------------------
 
 const DISK_POLL_MS = 5_000
+const PLUGIN_BOOT_IDLE_TIMEOUT_MS = 1_500
+
+// Runtime plugins are maintenance work, not part of the first interactive
+// frame. Defer their initial disk scan and watcher setup so a new window can
+// paint its shell before plugin I/O competes for the renderer. The timeout
+// keeps discovery prompt on a busy renderer or platforms without idle callbacks.
+function schedulePluginBootWork(task: () => void): void {
+  if (typeof requestIdleCallback === 'function') {
+    requestIdleCallback(task, { timeout: PLUGIN_BOOT_IDLE_TIMEOUT_MS })
+  } else {
+    window.setTimeout(task, 0)
+  }
+}
 
 interface DiskPlugin {
   file: string
@@ -368,28 +381,30 @@ export function watchRuntimePlugins(): void {
     }
   }
 
-  void scanDiskPlugins()
-  void startDirWatch().then(watched => {
-    if (watched) {
-      return
-    }
-
-    const timer = window.setInterval(() => {
-      if (document.visibilityState !== 'visible') {
+  schedulePluginBootWork(() => {
+    void scanDiskPlugins()
+    void startDirWatch().then(watched => {
+      if (watched) {
         return
       }
 
-      void scanDiskPlugins()
+      const timer = window.setInterval(() => {
+        if (document.visibilityState !== 'visible') {
+          return
+        }
 
-      // The dir may have been created since — upgrade to the watch and retire
-      // this poll once it lands.
-      if (dirWatchId === null) {
-        void startDirWatch().then(upgraded => {
-          if (upgraded) {
-            window.clearInterval(timer)
-          }
-        })
-      }
-    }, DISK_POLL_MS)
+        void scanDiskPlugins()
+
+        // The dir may have been created since — upgrade to the watch and retire
+        // this poll once it lands.
+        if (dirWatchId === null) {
+          void startDirWatch().then(upgraded => {
+            if (upgraded) {
+              window.clearInterval(timer)
+            }
+          })
+        }
+      }, DISK_POLL_MS)
+    })
   })
 }

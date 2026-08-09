@@ -175,9 +175,14 @@ export function useComposerSubmit({
         triggerHaptic('submit')
         clearDraft()
         dispatchSubmit(text)
+      } else if (!compacting && !attachments.length && text.trim()) {
+        // Cursor-style stop-and-correct: interrupt the live turn and redirect
+        // it with this text. redirect() preserves the shown reasoning/work; if
+        // the turn already ended, steerDraft re-queues so nothing is lost.
+        steerDraft()
       } else if (payloadPresent) {
-        // Enter never interrupts a live turn. Queue the full payload instead;
-        // steering is reserved for its explicit control/shortcut below.
+        // Attachments can't ride a redirect (no tool-result image carriage) —
+        // queue the whole payload for the next turn.
         queueCurrentDraft()
       } else {
         // Stop button (the only way to reach here while busy with an empty
@@ -207,7 +212,7 @@ export function useComposerSubmit({
 
     // Guard on live editor state, not the render-lagged `canSteer`: a redirect
     // fired on a fast Enter must not be dropped because state hasn't synced.
-    if (compacting || !onSteer || !text || attachments.length > 0 || SLASH_COMMAND_RE.test(text)) {
+    if (!onSteer || !text || attachments.length > 0 || SLASH_COMMAND_RE.test(text)) {
       return
     }
 

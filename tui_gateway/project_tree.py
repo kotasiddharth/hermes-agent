@@ -561,10 +561,15 @@ def build_tree(
     a scratch dir under /tmp) doesn't get promoted to a phantom AUTO project;
     omit it (remote backends) to keep every candidate.
 
-    Returns ``{"projects": [...], "scoped_session_ids": [...]}``. When
-    ``hydrate`` is False (overview), lane ``sessions`` arrays are emptied but
-    every count is preserved and each project carries up to ``preview_limit``
-    ``previewSessions``. When True (drill-in), lanes carry full session rows.
+    Returns ``{"projects": [...], "project_session_owners": {...},
+    "scoped_session_ids": [...]}``. ``project_session_owners`` maps every
+    session claimed by an actual explicit or auto project to that project's id;
+    the synthetic Home bucket is intentionally excluded so clients can render
+    true Recents. The legacy ``scoped_session_ids`` remains the union of every
+    tree bucket for tombstone reconciliation. When ``hydrate`` is False, lane
+    ``sessions`` arrays are emptied but every count is preserved and each
+    project carries up to ``preview_limit`` ``previewSessions``. When True
+    (drill-in), lanes carry full session rows.
     """
     active_projects = [p for p in projects if not p.get("archived")]
     _junk = is_junk_root or (lambda _root: False)
@@ -582,6 +587,7 @@ def build_tree(
             unowned.append(session)
 
     scoped_ids: list[str] = []
+    project_session_owners: dict[str, str] = {}
 
     def _previews(project_sessions: list[dict]) -> list[dict]:
         if preview_limit <= 0:
@@ -597,7 +603,9 @@ def build_tree(
     # Tier 1: explicit, user-created projects (always shown, even with 0 sessions).
     for project in active_projects:
         psessions = by_project.get(project["id"], [])
-        scoped_ids.extend(s["id"] for s in psessions if s.get("id"))
+        ids = [s["id"] for s in psessions if s.get("id")]
+        scoped_ids.extend(ids)
+        project_session_owners.update({sid: project["id"] for sid in ids})
         repos = _seed_folder_repos(
             _build_repos(psessions, resolve, hydrate), project.get("folders") or [], resolve
         )
@@ -683,7 +691,9 @@ def build_tree(
             homeless.extend(auto_sessions)
             continue
         seen.add(auto_key)
-        scoped_ids.extend(s["id"] for s in auto_sessions if s.get("id"))
+        ids = [s["id"] for s in auto_sessions if s.get("id")]
+        scoped_ids.extend(ids)
+        project_session_owners.update({sid: auto_root for sid in ids})
         result.append(
             _project_node(
                 pid=auto_root,
@@ -765,4 +775,8 @@ def build_tree(
             ),
         )
 
-    return {"projects": result, "scoped_session_ids": scoped_ids}
+    return {
+        "projects": result,
+        "project_session_owners": project_session_owners,
+        "scoped_session_ids": scoped_ids,
+    }

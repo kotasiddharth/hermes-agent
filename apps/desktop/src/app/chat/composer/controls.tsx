@@ -40,7 +40,6 @@ export function ComposerControls({
   busy,
   busyAction,
   canSubmit,
-  canSteer,
   compactModelPill = false,
   conversation,
   disabled,
@@ -48,13 +47,11 @@ export function ComposerControls({
   state,
   voiceStatus,
   onDictate,
-  onQueue,
-  onSteer
+  onQueue
 }: {
   busy: boolean
-  busyAction: 'queue' | 'stop'
+  busyAction: 'steer' | 'queue' | 'stop'
   canSubmit: boolean
-  canSteer: boolean
   compactModelPill?: boolean
   conversation: ConversationProps
   disabled: boolean
@@ -63,7 +60,6 @@ export function ComposerControls({
   voiceStatus: VoiceStatus
   onDictate: () => void
   onQueue: () => void
-  onSteer: () => void
 }) {
   const { t } = useI18n()
   const c = t.composer
@@ -73,24 +69,24 @@ export function ComposerControls({
   }
 
   const showVoicePrimary = !busy && !hasComposerPayload
-  const busyLabel = busyAction === 'queue' ? c.queueMessage : c.stop
+  const busyLabel = busyAction === 'queue' ? c.queueMessage : busyAction === 'steer' ? c.steer : c.stop
 
   return (
     <div className="ml-auto flex shrink-0 items-center gap-(--composer-control-gap)">
       <ModelPill compact={compactModelPill} disabled={disabled} model={state.model} />
       <DictationButton disabled={disabled} onToggle={onDictate} state={state.voice} status={voiceStatus} />
-      {canSteer ? (
-        <Tip label={<TipKeybindLabel actionId="composer.steer" text={c.steer} />}>
+      {busyAction === 'steer' ? (
+        <Tip label={<TipKeybindLabel actionId="composer.queue" text={c.queueMessage} />}>
           <Button
-            aria-label={c.steer}
+            aria-label={c.queueMessage}
             className={GHOST_ICON_BTN}
             disabled={disabled}
-            onClick={onSteer}
+            onClick={onQueue}
             size="icon"
             type="button"
             variant="ghost"
           >
-            <SteeringWheel className={iconSize.sm} />
+            <Layers3 className={iconSize.sm} />
           </Button>
         </Tip>
       ) : null}
@@ -115,7 +111,13 @@ export function ComposerControls({
           label={
             busy ? (
               <TipKeybindLabel
-                actionId={busyAction === 'queue' ? 'composer.queue' : 'composer.send'}
+                actionId={
+                  busyAction === 'steer'
+                    ? 'composer.steer'
+                    : busyAction === 'queue'
+                      ? 'composer.queue'
+                      : 'composer.send'
+                }
                 text={busyLabel}
               />
             ) : (
@@ -132,6 +134,8 @@ export function ComposerControls({
             {busy ? (
               busyAction === 'queue' ? (
                 <Layers3 className={iconSize.sm} />
+              ) : busyAction === 'steer' ? (
+                <SteeringWheel className={iconSize.sm} />
               ) : (
                 <span className="block size-2.5 rounded-[0.1875rem] bg-current" />
               )

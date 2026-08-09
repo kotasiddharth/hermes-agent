@@ -318,9 +318,13 @@ export function ChatBar({
   // into a tool result) and never for a slash command (those execute inline).
   const canSteer = busy && !compacting && !!onSteer && attachments.length === 0 && isSteerableText
 
-  // While busy, the primary action (and plain Enter) always queues a payload.
-  // Steering remains an intentional secondary action for a text-only draft.
-  const busyAction: 'queue' | 'stop' = hasComposerPayload ? 'queue' : 'stop'
+  // While busy: text redirects the live turn (Cursor-style stop-and-correct),
+  // attachments queue for the next turn, an empty composer stops.
+  const busyAction: 'steer' | 'queue' | 'stop' = canSteer
+    ? 'steer'
+    : compacting || hasComposerPayload
+      ? 'queue'
+      : 'stop'
 
   // The submit engine — the orchestration seam where draft + queue meet. Owns
   // the submit decision tree, the send-with-restore primitive, and steer.
@@ -762,8 +766,8 @@ export function ChatBar({
       return
     }
 
-    // Plain Enter queues a follow-up while a turn runs. Cmd/Ctrl+Enter keeps
-    // steering available as an intentional text-only correction.
+    // Cmd/Ctrl+Enter queues a follow-up while a turn runs. Plain Enter steers
+    // a text-only draft, so both live-turn actions stay reachable by keyboard.
     if (event.key === 'Enter' && (event.metaKey || event.ctrlKey) && !event.shiftKey) {
       event.preventDefault()
 
@@ -777,11 +781,7 @@ export function ChatBar({
           setComposerText(editorText)
         }
 
-        if (canSteer) {
-          steerDraft()
-        } else {
-          queueDraft()
-        }
+        queueDraft()
       }
 
       return
@@ -931,7 +931,6 @@ export function ChatBar({
     <ComposerControls
       busy={busy}
       busyAction={busyAction}
-      canSteer={canSteer}
       canSubmit={canSubmit}
       compactModelPill={poppedOut || compactPill}
       conversation={{
@@ -948,7 +947,6 @@ export function ChatBar({
       hasComposerPayload={hasComposerPayload}
       onDictate={dictate}
       onQueue={queueDraft}
-      onSteer={steerDraft}
       state={state}
       voiceStatus={voiceStatus}
     />

@@ -560,6 +560,12 @@ export function TreeSplit({ node, root, rootRow }: { node: SplitNode; root?: boo
         const partner = collapsed ? -1 : seamPartner(i)
         const absorbs = i === absorberIndex
 
+        // The workspace owns its rounded left edge (including the visible
+        // divider below the curve). Do not layer the generic sash hairline
+        // underneath it: its square top otherwise peeks out above the curve.
+        const workspaceOwnsSeam =
+          horizontal && child.type === 'group' && child.panes.some(id => paneChrome(paneFor(id)).uncloseable)
+
         return (
           <div
             aria-hidden={collapsed || undefined}
@@ -598,6 +604,7 @@ export function TreeSplit({ node, root, rootRow }: { node: SplitNode; root?: boo
             {partner >= 0 && (
               <Sash
                 disabled={minimized || tracks[partner].minimized}
+                hideHairline={workspaceOwnsSeam}
                 horizontal={horizontal}
                 onDoubleClick={() => resetBoundary(partner, i)}
                 onPointerDown={e => startSash(partner, i, e)}
@@ -620,11 +627,13 @@ export function TreeSplit({ node, root, rootRow }: { node: SplitNode; root?: boo
 
 function Sash({
   disabled,
+  hideHairline = false,
   horizontal,
   onDoubleClick,
   onPointerDown
 }: {
   disabled?: boolean
+  hideHairline?: boolean
   horizontal: boolean
   onDoubleClick?: () => void
   onPointerDown: (e: ReactPointerEvent<HTMLDivElement>) => void
@@ -640,25 +649,29 @@ function Sash({
       onPointerDown={disabled ? undefined : onPointerDown}
       role="separator"
     >
-      {/* Persistent hairline: the structural boundary between the navigation
-          rail and workspace must remain legible even when a theme's two
-          surfaces are close in value. Keep the same token for every seam, but
-          make its resting state visible rather than relying on hover alone. */}
-      <span
-        className={cn(
-          'absolute bg-(--ui-stroke-secondary) opacity-55 transition-opacity duration-100 group-hover:opacity-100',
-          horizontal ? 'inset-y-0 left-1/2 w-px -translate-x-1/2' : 'inset-x-0 top-1/2 h-px -translate-y-1/2'
-        )}
-      />
-      {!disabled && (
-        <span
-          className={cn(
-            'absolute bg-(--ui-sash-hover-border) opacity-0 transition-opacity duration-100 group-hover:opacity-100',
-            horizontal
-              ? 'inset-y-0 left-1/2 w-(--vscode-sash-hover-size,0.25rem) -translate-x-1/2'
-              : 'inset-x-0 top-1/2 h-(--vscode-sash-hover-size,0.25rem) -translate-y-1/2'
+      {!hideHairline && (
+        <>
+          {/* Persistent hairline: the structural boundary between the navigation
+              rail and workspace must remain legible even when a theme's two
+              surfaces are close in value. Keep the same token for every seam,
+              but make its resting state visible rather than relying on hover alone. */}
+          <span
+            className={cn(
+              'absolute bg-(--ui-stroke-secondary) opacity-55 transition-opacity duration-100 group-hover:opacity-100',
+              horizontal ? 'inset-y-0 left-1/2 w-px -translate-x-1/2' : 'inset-x-0 top-1/2 h-px -translate-y-1/2'
+            )}
+          />
+          {!disabled && (
+            <span
+              className={cn(
+                'absolute bg-(--ui-sash-hover-border) opacity-0 transition-opacity duration-100 group-hover:opacity-100',
+                horizontal
+                  ? 'inset-y-0 left-1/2 w-(--vscode-sash-hover-size,0.25rem) -translate-x-1/2'
+                  : 'inset-x-0 top-1/2 h-(--vscode-sash-hover-size,0.25rem) -translate-y-1/2'
+              )}
+            />
           )}
-        />
+        </>
       )}
     </div>
   )

@@ -355,6 +355,7 @@ def test_scoped_session_ids_is_union_of_placed_sessions():
     tree = pt.build_tree([project], [owned, auto, homeless], [], resolve, hydrate=True)
 
     assert set(tree["scoped_session_ids"]) == {owned["id"], auto["id"], homeless["id"]}
+    assert tree["project_session_owners"] == {owned["id"]: "p_app", auto["id"]: "/www/repo"}
     assert _home_session_ids(tree) == [homeless["id"]]
 
 

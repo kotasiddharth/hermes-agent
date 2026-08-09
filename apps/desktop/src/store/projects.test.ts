@@ -9,6 +9,7 @@ import { $currentCwd, $selectedStoredSessionId, $sessions, applyConfiguredDefaul
 import {
   $activeProjectId,
   $projectScope,
+  $projectSessionOwners,
   $projectsRpcAvailable,
   $projectTree,
   $removedSessionIds,
@@ -474,6 +475,7 @@ describe('project tree profile isolation', () => {
       connectionState: 'open',
       request: vi.fn().mockResolvedValue({
         active_id: null,
+        project_session_owners: { 'session-b': 'profile-b' },
         projects: [{ id: 'profile-b', label: 'Profile B', path: null, repos: [], sessionCount: 0 }],
         scoped_session_ids: []
       })
@@ -490,12 +492,14 @@ describe('project tree profile isolation', () => {
     await refreshProjectTree()
     resolveA?.({
       active_id: null,
+      project_session_owners: { 'session-a': 'profile-a' },
       projects: [{ id: 'profile-a', label: 'Profile A', path: null, repos: [], sessionCount: 0 }],
       scoped_session_ids: []
     })
     await pendingA
 
     expect($projectTree.get().map(project => project.id)).toEqual(['profile-b'])
+    expect($projectSessionOwners.get()).toEqual({ 'session-b': 'profile-b' })
   })
 })
 

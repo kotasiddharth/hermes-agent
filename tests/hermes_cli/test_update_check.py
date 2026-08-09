@@ -23,7 +23,9 @@ def test_check_for_updates_uses_cache(tmp_path, monkeypatch):
     (repo_dir / ".git").mkdir()
 
     cache_file = tmp_path / ".update_check"
-    cache_file.write_text(json.dumps({"ts": time.time(), "behind": 3, "ver": __version__}))
+    cache_file.write_text(
+        json.dumps({"schema": 2, "ts": time.time(), "behind": 3, "ver": __version__})
+    )
 
     monkeypatch.setenv("HERMES_HOME", str(tmp_path))
     with patch("hermes_cli.banner.subprocess.run") as mock_run:
@@ -31,6 +33,59 @@ def test_check_for_updates_uses_cache(tmp_path, monkeypatch):
 
     assert result == 3
     mock_run.assert_not_called()
+
+
+def test_release_update_target_uses_newest_published_tag(tmp_path, monkeypatch):
+    """A detached release checkout checks releases, never unreleased main."""
+    import hermes_cli.banner as banner
+
+    def fake_git_stdout(args, *, cwd, timeout=5):
+        assert cwd == tmp_path
+        if args[:3] == ["tag", "--points-at", "HEAD"]:
+            return "v2026.8.3"
+        raise AssertionError(f"unexpected git command: {args}")
+
+    monkeypatch.setattr(banner, "_git_stdout", fake_git_stdout)
+    monkeypatch.setattr(
+        banner.subprocess,
+        "run",
+        lambda *args, **kwargs: MagicMock(
+            returncode=0,
+            stdout=(
+                "a refs/tags/v2026.7.30\n"
+                "b refs/tags/v2026.8.3\n"
+                "c refs/tags/v2026.8.10\n"
+            ),
+        ),
+    )
+
+    assert banner.release_update_target(tmp_path) == ("v2026.8.3", "v2026.8.10")
+
+
+def test_release_checkout_is_current_when_its_tag_is_latest(tmp_path, monkeypatch):
+    """Latest tagged releases must not be flagged behind origin/main."""
+    import hermes_cli.banner as banner
+
+    monkeypatch.setattr(
+        banner,
+        "release_update_target",
+        lambda repo_dir: ("v2026.8.3", "v2026.8.3"),
+    )
+
+    assert banner._check_via_local_git(tmp_path) == 0
+
+
+def test_release_checkout_reports_only_when_a_newer_tag_exists(tmp_path, monkeypatch):
+    """A release checkout reports availability for a newer published tag."""
+    import hermes_cli.banner as banner
+
+    monkeypatch.setattr(
+        banner,
+        "release_update_target",
+        lambda repo_dir: ("v2026.8.3", "v2026.8.10"),
+    )
+
+    assert banner._check_via_local_git(tmp_path) == banner.UPDATE_AVAILABLE_NO_COUNT
 
 
 

@@ -5,6 +5,7 @@ Pure display functions with no HermesCLI state dependency.
 import json
 import logging
 import os
+import re
 import shutil
 import subprocess
 import threading
@@ -122,6 +123,7 @@ def get_available_skills() -> Dict[str, List[str]]:
 
 # Cache update check results for 6 hours to avoid repeated git fetches
 _UPDATE_CHECK_CACHE_SECONDS = 6 * 3600
+_UPDATE_CHECK_CACHE_SCHEMA = 2
 
 # Sentinel returned when we know an update exists but can't count commits
 # (e.g. nix-built hermes — no local git history to count against).
@@ -129,6 +131,23 @@ UPDATE_AVAILABLE_NO_COUNT = -1
 
 _UPSTREAM_REPO_URL = "https://github.com/NousResearch/hermes-agent.git"
 _OFFICIAL_REPO_CANONICAL = "github.com/nousresearch/hermes-agent"
+_RELEASE_TAG_RE = re.compile(r"^v(\d+(?:\.\d+){2,})(?:[-+][0-9A-Za-z.-]+)?$")
+
+
+def _release_tag_key(tag: str) -> tuple[int, ...] | None:
+    """Return a sortable key for a stable Hermes release tag."""
+    match = _RELEASE_TAG_RE.fullmatch(tag.strip())
+    if not match:
+        return None
+    return tuple(int(part) for part in match.group(1).split("."))
+
+
+def _latest_tag(tags: list[str]) -> str | None:
+    """Pick the newest stable release tag from a collection of tag names."""
+    candidates = [(key, tag) for tag in tags if (key := _release_tag_key(tag)) is not None]
+    if not candidates:
+        return None
+    return max(candidates)[1]
 
 
 def _canonical_github_remote(url: str | None) -> str:
@@ -182,6 +201,42 @@ def _git_stdout(args: list[str], *, cwd: Path, timeout: int = 5) -> Optional[str
     return (result.stdout or "").strip()
 
 
+def release_update_target(repo_dir: Path) -> tuple[str, str] | None:
+    """Return ``(current_tag, latest_tag)`` for a checked-out release."""
+    current_tags = (
+        _git_stdout(["tag", "--points-at", "HEAD", "--list", "v*"], cwd=repo_dir) or ""
+    ).splitlines()
+    current_tag = _latest_tag(current_tags)
+    if not current_tag:
+        return None
+
+    try:
+        result = subprocess.run(
+            ["git", "ls-remote", "--tags", "--refs", "origin", "v*"],
+            capture_output=True,
+            text=True,
+            encoding="utf-8",
+            errors="replace",
+            timeout=10,
+            cwd=str(repo_dir),
+        )
+    except Exception:
+        return None
+    if result.returncode != 0:
+        return None
+
+    latest_tag = _latest_tag(
+        [
+            line.rsplit("/", 1)[-1]
+            for line in (result.stdout or "").splitlines()
+            if "refs/tags/" in line
+        ]
+    )
+    if not latest_tag:
+        return None
+    return current_tag, latest_tag
+
+
 def _check_via_rev(local_rev: str) -> Optional[int]:
     """Compare an embedded git revision to upstream main via ls-remote.
 
@@ -206,6 +261,11 @@ def _check_via_rev(local_rev: str) -> Optional[int]:
 
 def _check_via_local_git(repo_dir: Path) -> Optional[int]:
     """Count commits behind origin/main in a local checkout."""
+    release_target = release_update_target(repo_dir)
+    if release_target is not None:
+        current_tag, latest_tag = release_target
+        return 0 if current_tag == latest_tag else UPDATE_AVAILABLE_NO_COUNT
+
     origin_url = _git_stdout(["remote", "get-url", "origin"], cwd=repo_dir)
     if _is_official_ssh_remote(origin_url):
         head_rev = _git_stdout(["rev-parse", "HEAD"], cwd=repo_dir)
@@ -310,6 +370,7 @@ def check_for_updates() -> Optional[int]:
             cached = json.loads(cache_file.read_text(encoding="utf-8"))
             if (
                 now - cached.get("ts", 0) < _UPDATE_CHECK_CACHE_SECONDS
+                and cached.get("schema") == _UPDATE_CHECK_CACHE_SCHEMA
                 and cached.get("rev") == embedded_rev
                 and cached.get("ver") == VERSION
             ):
@@ -336,7 +397,15 @@ def check_for_updates() -> Optional[int]:
 
     try:
         cache_file.write_text(
-            json.dumps({"ts": now, "behind": behind, "rev": embedded_rev, "ver": VERSION}),
+            json.dumps(
+                {
+                    "schema": _UPDATE_CHECK_CACHE_SCHEMA,
+                    "ts": now,
+                    "behind": behind,
+                    "rev": embedded_rev,
+                    "ver": VERSION,
+                }
+            ),
             encoding="utf-8",
         )
     except Exception:

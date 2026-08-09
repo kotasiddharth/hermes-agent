@@ -4145,8 +4145,16 @@ async def update_hermes():
 
     action_id = secrets.token_hex(16)
     try:
+        from hermes_cli.banner import release_update_target
+
+        update_args = ["update"]
+        release_target = await asyncio.to_thread(release_update_target, PROJECT_ROOT)
+        if release_target is not None:
+            _, latest_tag = release_target
+            update_args.extend(["--branch", latest_tag])
+
         proc = _spawn_hermes_action(
-            ["update"],
+            update_args,
             "hermes-update",
             env_overrides={"HERMES_ACTION_ID": action_id},
         )
@@ -4257,6 +4265,17 @@ async def check_hermes_update(force: bool = False):
 
     install_method = detect_install_method(PROJECT_ROOT)
     update_command = recommended_update_command_for_method(install_method)
+    release_target = None
+
+    try:
+        from hermes_cli.banner import release_update_target
+
+        release_target = await asyncio.to_thread(release_update_target, PROJECT_ROOT)
+        if release_target is not None:
+            _, latest_tag = release_target
+            update_command = f"hermes update --branch {latest_tag}"
+    except Exception:
+        pass
 
     payload: Dict[str, Any] = {
         "install_method": install_method,
@@ -4299,7 +4318,7 @@ async def check_hermes_update(force: bool = False):
         # Enrich with the actual commits we're behind by, so the desktop's
         # remote update overlay can show "what's changed". git only;
         # best-effort (empty list on any failure).
-        if install_method == "git":
+        if install_method == "git" and release_target is None:
             payload["commits"] = await asyncio.to_thread(_recent_upstream_commits)
 
     return payload

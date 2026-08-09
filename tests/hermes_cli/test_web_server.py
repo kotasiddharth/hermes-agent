@@ -1140,6 +1140,42 @@ class TestWebServerEndpoints:
             (["update"], "hermes-update", {"HERMES_ACTION_ID": "a" * 32})
         ]
 
+    def test_update_hermes_keeps_release_channel_on_tagged_installs(self, monkeypatch):
+        import hermes_cli.banner as banner
+        import hermes_cli.web_server as web_server
+
+        class Proc:
+            pid = 12345
+
+        calls = []
+
+        def fake_spawn(subcommand, name, *, env_overrides=None):
+            calls.append((subcommand, name, env_overrides))
+            return Proc()
+
+        monkeypatch.setattr(web_server, "_dashboard_local_update_managed_externally", lambda: False)
+        monkeypatch.setattr(web_server, "detect_install_method", lambda _root: "git")
+        monkeypatch.setattr(web_server.secrets, "token_hex", lambda _size: "a" * 32)
+        monkeypatch.setattr(web_server, "_spawn_hermes_action", fake_spawn)
+        monkeypatch.setattr(
+            banner,
+            "release_update_target",
+            lambda _root: ("v2026.8.3", "v2026.8.10"),
+        )
+        web_server._ACTION_PROCS.pop("hermes-update", None)
+        web_server._ACTION_RESULTS.pop("hermes-update", None)
+
+        resp = self.client.post("/api/hermes/update")
+
+        assert resp.status_code == 200
+        assert calls == [
+            (
+                ["update", "--branch", "v2026.8.10"],
+                "hermes-update",
+                {"HERMES_ACTION_ID": "a" * 32},
+            )
+        ]
+
     def test_update_hermes_reuses_running_action(self, monkeypatch):
         import hermes_cli.web_server as web_server
 

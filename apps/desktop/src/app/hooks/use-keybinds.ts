@@ -5,7 +5,6 @@ import { closeActiveTab } from '@/app/chat/close-tab'
 import { setTerminalTakeover } from '@/app/right-sidebar/store'
 import { closeActiveTerminal, createTerminal, cycleTerminal } from '@/app/right-sidebar/terminal/terminals'
 import {
-  activateTreeTabSlot,
   cycleTreeTabInFocusedZone,
   isPaneVisible,
   layoutHasRootSide,
@@ -13,7 +12,7 @@ import {
 } from '@/components/pane-shell/tree/store'
 import { onReleaseTypingFocus } from '@/components/ui/keyboard-first'
 import { findBarClaimsCombo } from '@/lib/find-in-page'
-import { contributedKeybindHandler, PROFILE_SLOT_COUNT, SESSION_SLOT_COUNT } from '@/lib/keybinds/actions'
+import { contributedKeybindHandler, SESSION_SLOT_COUNT } from '@/lib/keybinds/actions'
 import { comboAllowedInInput, comboFromEvent, isEditableTarget } from '@/lib/keybinds/combo'
 import { composerFocusKeysAllowed, isComposerFocusSoftCombo, typeToFocusChar } from '@/lib/keybinds/composer-focus-keys'
 import { openWorktreeDialog } from '@/store/coding-status'
@@ -32,14 +31,6 @@ import {
   togglePanesFlipped,
   toggleSidebarOpen
 } from '@/store/layout'
-import {
-  $newChatProfile,
-  cycleProfile,
-  requestProfileCreate,
-  switchProfileToSlot,
-  switchToDefaultProfile,
-  toggleShowAllProfiles
-} from '@/store/profile'
 import { openFolderAsProject } from '@/store/projects'
 import { toggleReview } from '@/store/review'
 import { $selectedStoredSessionId, setModelPickerOpen } from '@/store/session'
@@ -69,7 +60,6 @@ import {
   MESSAGING_ROUTE,
   navigateToWorkspacePage,
   NEW_CHAT_ROUTE,
-  PROFILES_ROUTE,
   sessionRoute,
   SETTINGS_ROUTE,
   SKILLS_ROUTE
@@ -99,8 +89,6 @@ export function useKeybinds(deps: KeybindRuntimeDeps): void {
   const handlersRef = useRef<HandlerMap>({})
   const commitSwitcherRef = useRef<() => void>(() => {})
 
-  const profileSwitchHandlers: HandlerMap = {}
-
   // A tab key that lands on the WORKSPACE tab while a full page (skills /
   // messaging / artifacts / a plugin route) covers it must also route back to
   // the chat: the workspace pane is already the zone's active tab behind the
@@ -112,20 +100,6 @@ export function useKeybinds(deps: KeybindRuntimeDeps): void {
       const selected = $selectedStoredSessionId.get()
 
       navigate(selected ? sessionRoute(selected) : NEW_CHAT_ROUTE)
-    }
-  }
-
-  for (let slot = 1; slot <= PROFILE_SLOT_COUNT; slot += 1) {
-    // ⌘1…⌘9 switch the FOCUSED zone's tab when it's a real tab strip; only a
-    // single-pane (or unfocused) layout falls through to the profile switch.
-    profileSwitchHandlers[`profile.switch.${slot}`] = () => {
-      const pane = activateTreeTabSlot(slot)
-
-      if (pane) {
-        leavePageForWorkspaceChat(pane)
-      } else {
-        switchProfileToSlot(slot)
-      }
     }
   }
 
@@ -186,7 +160,6 @@ export function useKeybinds(deps: KeybindRuntimeDeps): void {
     'nav.commandPalette': toggleCommandPalette,
     'nav.commandCenter': deps.toggleCommandCenter,
     'nav.settings': () => navigate(SETTINGS_ROUTE),
-    'nav.profiles': () => navigate(PROFILES_ROUTE),
     'nav.skills': () => navigateToWorkspacePage(navigate, SKILLS_ROUTE),
     'nav.messaging': () => navigateToWorkspacePage(navigate, MESSAGING_ROUTE),
     'nav.artifacts': () => navigateToWorkspacePage(navigate, ARTIFACTS_ROUTE),
@@ -194,10 +167,6 @@ export function useKeybinds(deps: KeybindRuntimeDeps): void {
     'nav.agents': () => navigate(AGENTS_ROUTE),
 
     'session.new': () => {
-      // Match the sidebar New Session button. A plain keyboard new chat should
-      // target the current live profile, not a stale per-profile quick-create
-      // selection from a prior action.
-      $newChatProfile.set(null)
       deps.startFreshSession()
       window.dispatchEvent(new CustomEvent('hermes:new-session-shortcut'))
     },
@@ -258,14 +227,7 @@ export function useKeybinds(deps: KeybindRuntimeDeps): void {
     'view.findNext': findNextMatch,
     'view.findPrevious': findPreviousMatch,
 
-    'appearance.toggleMode': () => setMode(resolvedMode === 'dark' ? 'light' : 'dark'),
-
-    'profile.default': switchToDefaultProfile,
-    ...profileSwitchHandlers,
-    'profile.next': () => cycleProfile(1),
-    'profile.prev': () => cycleProfile(-1),
-    'profile.toggleAll': toggleShowAllProfiles,
-    'profile.create': requestProfileCreate
+    'appearance.toggleMode': () => setMode(resolvedMode === 'dark' ? 'light' : 'dark')
   }
 
   // A keyboard-driven overlay closing hands typing back to the composer: Radix

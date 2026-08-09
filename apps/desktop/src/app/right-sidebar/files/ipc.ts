@@ -146,7 +146,7 @@ export async function readProjectDir(dirPath: string, rootPath = dirPath): Promi
   }
 
   const result = await readDesktopDir(dirPath)
-  const entries = (result?.entries ?? []).filter(entry => !ALWAYS_EXCLUDED.has(entry.name))
+  const entries = (result?.entries ?? []).filter(entry => !ALWAYS_EXCLUDED.has(entry.name.toLowerCase()))
 
   return { ...result, entries: await filterIgnored(entries, rootPath, dirPath) }
 }

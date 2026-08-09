@@ -225,22 +225,24 @@ export const PROVIDER_GROUPS: ProviderPrefix[] = [
   }
 ]
 
-export const BUILTIN_PERSONALITIES = [
+// The response style is a small set of intentional, predictable choices. It
+// replaces profile-authored personas in Settings without exposing runtime
+// instruction files or custom prompt internals.
+export const ASSISTANT_RESPONSE_STYLES = [
   'helpful',
   'concise',
   'technical',
   'creative',
-  'teacher',
-  'kawaii',
-  'catgirl',
-  'pirate',
-  'shakespeare',
-  'surfer',
-  'noir',
-  'uwu',
-  'philosopher',
-  'hype'
+  'teacher'
 ]
+
+export const ASSISTANT_RESPONSE_STYLE_LABELS: Record<string, string> = {
+  helpful: 'Kind & helpful',
+  concise: 'Quick & concise',
+  technical: 'Technical & direct',
+  teacher: 'Patient teacher',
+  creative: 'Creative collaborator'
+}
 
 // Schema-side select overrides for desktop-relevant enum fields whose
 // backend schema only declares a string type.
@@ -394,7 +396,7 @@ export const FIELD_LABELS: Record<string, string> = defineFieldCopy({
   toolsets: 'Enabled Toolsets',
   timezone: 'Timezone',
   display: {
-    personality: 'Personality',
+    personality: 'Response style',
     showReasoning: 'Reasoning Blocks'
   },
   desktop: {
@@ -560,7 +562,7 @@ export const FIELD_DESCRIPTIONS: Record<string, string> = defineFieldCopy({
   modelContextLength: "Leave at 0 to use the selected model's detected context window.",
   fallbackProviders: 'Backup provider:model entries to try if the default model fails.',
   display: {
-    personality: 'Default assistant style for new sessions.',
+    personality: 'Choose how the assistant communicates in new sessions.',
     showReasoning: 'Show reasoning sections when the backend provides them.'
   },
   desktop: {
@@ -642,13 +644,13 @@ export const SECTIONS: DesktopConfigSection[] = [
     id: 'model',
     label: 'Model',
     icon: Box,
-    keys: ['model_context_length', 'fallback_providers']
+    keys: []
   },
   {
     id: 'chat',
     label: 'Chat',
     icon: MessageCircle,
-    keys: ['display.personality', 'timezone', 'display.show_reasoning', 'agent.image_input_mode']
+    keys: ['display.personality', 'timezone', 'display.show_reasoning']
   },
   {
     id: 'appearance',
@@ -660,16 +662,7 @@ export const SECTIONS: DesktopConfigSection[] = [
     id: 'workspace',
     label: 'Workspace',
     icon: Monitor,
-    keys: [
-      'terminal.cwd',
-      'desktop.repo_scan_enabled',
-      'desktop.repo_scan_roots',
-      'desktop.repo_scan_exclude_paths',
-      'code_execution.mode',
-      'terminal.persistent_shell',
-      'terminal.env_passthrough',
-      'file_read_max_chars'
-    ]
+    keys: ['desktop.repo_scan_enabled']
   },
   {
     id: 'safety',
@@ -677,13 +670,7 @@ export const SECTIONS: DesktopConfigSection[] = [
     icon: Lock,
     keys: [
       'approvals.mode',
-      'approvals.timeout',
-      'approvals.mcp_reload_confirm',
-      'command_allowlist',
       'security.redact_secrets',
-      'security.allow_private_urls',
-      'browser.allow_private_urls',
-      'browser.auto_local_for_private_urls',
       'checkpoints.enabled'
     ]
   },
@@ -693,15 +680,7 @@ export const SECTIONS: DesktopConfigSection[] = [
     icon: Brain,
     keys: [
       'memory.memory_enabled',
-      'memory.user_profile_enabled',
-      'memory.memory_char_limit',
-      'memory.user_char_limit',
-      'memory.provider',
-      'context.engine',
-      'compression.enabled',
-      'compression.threshold',
-      'compression.target_ratio',
-      'compression.protect_last_n'
+      'memory.user_profile_enabled'
     ]
   },
   {
@@ -721,11 +700,6 @@ export const SECTIONS: DesktopConfigSection[] = [
       'tts.elevenlabs.model_id',
       'tts.xai.voice_id',
       'tts.xai.language',
-      'tts.xai.speed',
-      'tts.xai.auto_speech_tags',
-      'tts.xai.optimize_streaming_latency',
-      'tts.xai.sample_rate',
-      'tts.xai.bit_rate',
       'tts.minimax.model',
       'tts.minimax.voice_id',
       'tts.mistral.model',
@@ -748,8 +722,7 @@ export const SECTIONS: DesktopConfigSection[] = [
       'stt.elevenlabs.language_code',
       'stt.elevenlabs.tag_audio_events',
       'stt.elevenlabs.diarize',
-      'voice.record_key',
-      'voice.max_recording_seconds'
+      'voice.record_key'
     ]
   },
   {
@@ -757,6 +730,39 @@ export const SECTIONS: DesktopConfigSection[] = [
     label: 'Advanced',
     icon: Wrench,
     keys: [
+      // Raw limits, paths, backend/protocol choices, and recovery behavior are
+      // intentionally centralized here. They are useful for power users, but
+      // should never be required to get productive with Hermes.
+      'model_context_length',
+      'fallback_providers',
+      'agent.image_input_mode',
+      'terminal.cwd',
+      'desktop.repo_scan_roots',
+      'desktop.repo_scan_exclude_paths',
+      'code_execution.mode',
+      'terminal.persistent_shell',
+      'terminal.env_passthrough',
+      'file_read_max_chars',
+      'approvals.timeout',
+      'approvals.mcp_reload_confirm',
+      'command_allowlist',
+      'security.allow_private_urls',
+      'browser.allow_private_urls',
+      'browser.auto_local_for_private_urls',
+      'memory.memory_char_limit',
+      'memory.user_char_limit',
+      'memory.provider',
+      'context.engine',
+      'compression.enabled',
+      'compression.threshold',
+      'compression.target_ratio',
+      'compression.protect_last_n',
+      'tts.xai.speed',
+      'tts.xai.auto_speech_tags',
+      'tts.xai.optimize_streaming_latency',
+      'tts.xai.sample_rate',
+      'tts.xai.bit_rate',
+      'voice.max_recording_seconds',
       'toolsets',
       'terminal.backend',
       'terminal.timeout',

@@ -2,7 +2,6 @@ import { useStore } from '@nanostores/react'
 import { memo } from 'react'
 import type * as React from 'react'
 
-import { ProfileTag } from '@/app/chat/profile-tag'
 import { startSessionDrag } from '@/app/chat/session-drag'
 import { PlatformAvatar } from '@/app/messaging/platform-icon'
 import { openSession } from '@/app/open-session'
@@ -44,7 +43,6 @@ interface SidebarSessionRowProps extends React.ComponentProps<'div'> {
   /** Tag the row with its owning profile (initial chip + tooltip). Used by
    *  flat cross-profile lists — Pinned and search results in the All-profiles
    *  view — where no group header communicates ownership (#66003). */
-  showProfile?: boolean
 }
 
 const AGE_KEY = { day: 'ageDay', hour: 'ageHour', minute: 'ageMin' } as const
@@ -70,7 +68,6 @@ function SidebarSessionRowImpl({
   reorderable = false,
   dragging = false,
   dragHandleProps,
-  showProfile = false,
   className,
   style,
   ref,
@@ -241,7 +238,6 @@ function SidebarSessionRowImpl({
           <SidebarRowLabel className="flex-1 font-normal group-hover:text-foreground group-data-[working=true]:text-foreground/90">
             {title}
           </SidebarRowLabel>
-          {showProfile && <ProfileTag profile={session.profile} />}
         </SidebarRowBody>
       </SidebarRowShell>
     </SessionContextMenu>
@@ -268,7 +264,6 @@ function rowPropsEqual(a: SidebarSessionRowProps, b: SidebarSessionRowProps): bo
     a.branchStem === b.branchStem &&
     a.reorderable === b.reorderable &&
     a.dragging === b.dragging &&
-    a.showProfile === b.showProfile &&
     a.dragHandleProps === b.dragHandleProps &&
     a.className === b.className &&
     a.style === b.style

@@ -873,7 +873,7 @@ export interface ProfileSetupCommand {
 
 // The desktop appearance/interface overlay bundled into a profile export as
 // `desktop.json`. Everything optional — an archive exported by an older (or
-// non-desktop) Hermes simply carries none of it. See store/profile-share.ts.
+// non-desktop) Hermes simply carries none of it.
 export interface ProfileDesktopOverlay {
   /** Overlay schema version (1). */
   version?: number
@@ -1283,6 +1283,16 @@ export interface SkillHubSourcesResponse {
   index_available: boolean
   featured: SkillHubResult[]
   installed: Record<string, SkillHubInstalledEntry>
+}
+
+/** A user-added GitHub repository that Browse Hub searches for skills. */
+export interface SkillHubTap {
+  repo: string
+  path: string
+}
+
+export interface SkillHubTapsResponse {
+  taps: SkillHubTap[]
 }
 
 export interface SkillHubSearchResponse {

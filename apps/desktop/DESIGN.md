@@ -43,6 +43,11 @@ one-off at the call site.
 7. **Immediate feedback.** Direct manipulation updates the view first. Network
    or disk persistence reconciles afterward and rolls back visibly on failure.
 
+Working panes are the one structural exception to the flatness rule: each tree
+zone is a single rounded surface separated by a small gutter. Its contents stay
+flat; do not add nested card chrome. All other corner radii come from the shared
+`--radius-*` scale in `src/styles.css`, never local overrides.
+
 ## Information architecture
 
 - **Chat is the home surface.** The transcript and composer stay primary; tools,

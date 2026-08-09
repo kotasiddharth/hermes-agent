@@ -26,6 +26,67 @@ const PSYCHE_WARM = '#FFE6CB'
 const nousTint = (pct: number) => `color-mix(in srgb, ${NOUS_BLUE} ${pct}%, #FFFFFF)`
 const nousTintTransparent = (pct: number) => `color-mix(in srgb, ${NOUS_BLUE} ${pct}%, transparent)`
 
+type TwoToneThemeOptions = {
+  name: string
+  label: string
+  description: string
+  surface: string
+  sidebar: string
+  border: string
+  foreground: string
+  mutedForeground: string
+  accent: string
+}
+
+// Solid two-tone skins intentionally use just a main chat surface and a
+// contrasting sidebar/bubble surface. The semantic tokens still give controls
+// and focus states enough definition, but the transcript stays calm and free
+// of wallpaper, gradients, or a glassy third background.
+function twoToneTheme({
+  name,
+  label,
+  description,
+  surface,
+  sidebar,
+  border,
+  foreground,
+  mutedForeground,
+  accent
+}: TwoToneThemeOptions): DesktopTheme {
+  return {
+    name,
+    label,
+    description,
+    colors: {
+      background: surface,
+      foreground,
+      card: surface,
+      cardForeground: foreground,
+      muted: sidebar,
+      mutedForeground,
+      popover: sidebar,
+      popoverForeground: foreground,
+      primary: accent,
+      primaryForeground: surface,
+      secondary: sidebar,
+      secondaryForeground: foreground,
+      accent: sidebar,
+      accentForeground: foreground,
+      border,
+      input: border,
+      ring: accent,
+      midground: accent,
+      composerRing: accent,
+      destructive: '#e26d7b',
+      destructiveForeground: surface,
+      sidebarBackground: sidebar,
+      sidebarBorder: border,
+      userBubble: sidebar,
+      userBubbleBorder: border
+    }
+  }
+}
+
 /**
  * Nous — canonical Hermes desktop identity. The palette keeps the current
  * glass geometry neutral, then lets the old bb/gui blue and psyche cream
@@ -276,13 +337,69 @@ export const slateTheme: DesktopTheme = {
   }
 }
 
+/** Charcoal and slate, tuned to keep the chat surface especially quiet. */
+export const graphiteTheme = twoToneTheme({
+  name: 'graphite',
+  label: 'Graphite',
+  description: 'Charcoal chat with a slate sidebar',
+  surface: '#181a1b',
+  sidebar: '#242729',
+  border: '#363b3d',
+  foreground: '#e6e9e8',
+  mutedForeground: '#a5afad',
+  accent: '#90c7b6'
+})
+
+/** Deep blue-grey, with a cool teal accent for focus and active states. */
+export const tideTheme = twoToneTheme({
+  name: 'tide',
+  label: 'Tide',
+  description: 'Deep blue-grey chat with a teal sidebar',
+  surface: '#101b20',
+  sidebar: '#1c2b31',
+  border: '#2c424a',
+  foreground: '#e5f3f4',
+  mutedForeground: '#9bb9be',
+  accent: '#80cad9'
+})
+
+/** A subdued forest pairing that stays legible through long conversations. */
+export const mossTheme = twoToneTheme({
+  name: 'moss',
+  label: 'Moss',
+  description: 'Deep green chat with a moss sidebar',
+  surface: '#151d18',
+  sidebar: '#222d26',
+  border: '#35463b',
+  foreground: '#e9f2e8',
+  mutedForeground: '#a8bda8',
+  accent: '#9bc7a3'
+})
+
+/** Eggplant and plum surfaces with a soft lilac interaction color. */
+export const plumTheme = twoToneTheme({
+  name: 'plum',
+  label: 'Plum',
+  description: 'Deep plum chat with a violet sidebar',
+  surface: '#1b1720',
+  sidebar: '#2a2230',
+  border: '#40334a',
+  foreground: '#f2e9f6',
+  mutedForeground: '#c1aec9',
+  accent: '#d0a9e4'
+})
+
 export const BUILTIN_THEMES: Record<string, DesktopTheme> = {
   nous: nousTheme,
   midnight: midnightTheme,
   ember: emberTheme,
   mono: monoTheme,
   cyberpunk: cyberpunkTheme,
-  slate: slateTheme
+  slate: slateTheme,
+  graphite: graphiteTheme,
+  tide: tideTheme,
+  moss: mossTheme,
+  plum: plumTheme
 }
 
 export const BUILTIN_THEME_LIST = Object.values(BUILTIN_THEMES)

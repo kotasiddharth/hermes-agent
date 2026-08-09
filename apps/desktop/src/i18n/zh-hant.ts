@@ -218,6 +218,7 @@ export const zhHant = defineLocale({
     exportFailed: '匯出失敗',
     resetFailed: '重設失敗',
     nav: {
+      general: 'General',
       providers: '提供方',
       providerAccounts: '帳號',
       providerApiKeys: 'API 金鑰',
@@ -232,6 +233,22 @@ export const zhHant = defineLocale({
       about: '關於',
       billing: '帳單',
       notifications: '通知'
+    },
+    general: {
+      title: 'General',
+      intro: 'Everyday desktop behavior for this computer.',
+      launchOnStartupTitle: 'Launch Hermes at sign-in',
+      launchOnStartupDesc: 'Start Hermes automatically when you sign in to your computer.',
+      launchOnStartupUnsupported: 'Launch at sign-in is available on Windows and macOS.',
+      closeToTrayTitle: 'Close to tray',
+      closeToTrayDesc: 'Keep Hermes running in the system tray when you close its window.',
+      hapticsTitle: '觸感回饋',
+      hapticsDesc: '裝置支援時，為應用程式操作提供輕微的觸感回饋。',
+      desktopOnly: 'This setting is available in the Hermes desktop app.',
+      productivityTitle: 'Productivity',
+      productivityIntro: 'Helpful desktop behavior without changing how the AI responds.',
+      loadFailed: 'Could not load general settings',
+      saveFailed: 'Could not save general settings'
     },
     notifications: {
       title: '通知',
@@ -317,10 +334,16 @@ export const zhHant = defineLocale({
       terminalFontPlaceholder: 'MesloLGS NF 或 CSS 字型堆疊',
       terminalFontPreview: '字形預覽',
       terminalFontReset: '使用預設字型',
+      glassTitle: '毛玻璃效果',
+      glassDesc: '為應用程式列、選單和面板加入半透明磨砂效果。即時聊天內容不會模糊，以維持快速回應。',
+      glassSolid: '實色',
+      glassSubtle: '輕微',
+      glassFrosted: '磨砂',
       translucencyTitle: '視窗透明',
       translucencyDesc: '讓整個視窗透出桌面。僅支援 macOS 與 Windows。',
-      backdropTitle: '聊天背景',
-      backdropDesc: '對話後方那張淡淡的雕像圖片。',
+      translucencySolid: '不透明',
+      translucencySoft: '輕透',
+      translucencyClear: '明顯',
       reactionsTitle: '訊息回應',
       reactionsDesc: 'iMessage 風格的表情回應 — 你可以對訊息做出回應，Hermes 也能回應你的訊息。',
       embedsTitle: '內嵌預覽',
@@ -871,6 +894,7 @@ export const zhHant = defineLocale({
       removedTitle: '帳號已移除',
       removedMessage: provider => `${provider} 已移除。`,
       failedRemove: provider => `無法移除 ${provider}`,
+      noAccounts: '沒有可用的登入帳戶。',
       noProviderKeys: '沒有可用的提供方 API 金鑰。',
       searchKeys: '搜尋提供方…',
       noKeysMatch: '沒有符合的提供方。',
@@ -1036,7 +1060,23 @@ export const zhHant = defineLocale({
     edit: '編輯',
     archive: '封存',
     skillArchivedTitle: '技能已封存',
-    skillArchivedMessage: '可透過 hermes curator restore 還原。'
+    skillArchivedMessage: '可透過 hermes curator restore 還原。',
+    hub: {
+      marketplaces: '你的市集',
+      addMarketplace: '新增市集',
+      addingMarketplace: '正在新增…',
+      removeMarketplace: '移除',
+      removingMarketplace: '正在移除…',
+      githubRepository: 'GitHub 儲存庫',
+      githubRepositoryPlaceholder: 'https://github.com/owner/repository',
+      marketplaceDescription: '新增在 skills 資料夾中包含技能的公開 GitHub 儲存庫。',
+      marketplaceInvalid: '請輸入 GitHub 儲存庫 URL 或 owner/repository。',
+      marketplaceAdded: repo => `已新增 ${repo}`,
+      marketplaceAlreadyAdded: repo => `${repo} 已新增`,
+      marketplaceRemoved: repo => `已移除 ${repo}`,
+      marketplaceFailed: '無法新增市集',
+      marketplaceRemoveFailed: '無法移除市集'
+    }
   },
 
   starmap: {
@@ -1622,7 +1662,7 @@ export const zhHant = defineLocale({
       'new-session': '新工作階段',
       skills: '技能與工具',
       messaging: '訊息平台',
-      artifacts: '成品'
+      scheduled: '排程'
     },
     searchAria: '搜尋工作階段',
     searchPlaceholder: '搜尋工作階段…',

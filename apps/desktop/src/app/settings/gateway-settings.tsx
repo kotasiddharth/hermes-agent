@@ -1,4 +1,3 @@
-import { useStore } from '@nanostores/react'
 import { useEffect, useMemo, useRef, useState } from 'react'
 
 import { Button } from '@/components/ui/button'
@@ -25,7 +24,6 @@ import { coerceRemoteUrlScheme } from '@/lib/remote-url'
 import { selectableCardClass } from '@/lib/selectable-card'
 import { cn } from '@/lib/utils'
 import { notify, notifyError } from '@/store/notifications'
-import { $profiles, refreshActiveProfile } from '@/store/profile'
 
 import { CONTROL_TEXT } from './constants'
 import { EmptyState, ListRow, Pill, SettingsContent, SettingsSkeleton } from './primitives'
@@ -51,7 +49,6 @@ interface GatewaySettingsState {
   sshPort: number | null
   sshKeyPath: string
   sshRemoteHermesPath: string
-  sshRemoteProfile: string
 }
 
 const SSH_HOST_CUSTOM = '__custom__'
@@ -69,8 +66,7 @@ const EMPTY_STATE: GatewaySettingsState = {
   sshUser: '',
   sshPort: null,
   sshKeyPath: '',
-  sshRemoteHermesPath: '',
-  sshRemoteProfile: ''
+  sshRemoteHermesPath: ''
 }
 
 export function savedCloudConnectionUrl(config: Pick<GatewaySettingsState, 'mode' | 'remoteUrl'>): string {
@@ -122,23 +118,6 @@ function ModeCard({
       <p className="mt-1.5 flex-1 text-[length:var(--conversation-caption-font-size)] leading-(--conversation-caption-line-height) text-(--ui-text-tertiary)">
         {description}
       </p>
-    </button>
-  )
-}
-
-function ScopeChip({ active, label, onSelect }: { active: boolean; label: string; onSelect: () => void }) {
-  return (
-    <button
-      className={cn(
-        'rounded-full border px-3 py-1 text-[length:var(--conversation-caption-font-size)] transition',
-        active
-          ? 'border-(--ui-stroke-secondary) bg-(--ui-bg-tertiary) text-(--ui-text-primary)'
-          : 'border-(--ui-stroke-tertiary) bg-(--ui-bg-quinary) text-(--ui-text-tertiary) hover:bg-(--chrome-action-hover)'
-      )}
-      onClick={onSelect}
-      type="button"
-    >
-      {label}
     </button>
   )
 }
@@ -198,16 +177,6 @@ export function GatewaySettings({ embedded = false }: { embedded?: boolean } = {
     setCloudOrgState(value)
   }
 
-  // Connection scope: null = the global/default connection (the original
-  // behavior); a profile name = that profile's per-profile remote override, so
-  // each profile can point at its own backend.
-  const [scope, setScope] = useState<null | string>(null)
-  const profiles = useStore($profiles)
-
-  useEffect(() => {
-    void refreshActiveProfile()
-  }, [])
-
   // Auth-mode probe: as the user types a remote URL we ask the gateway (via
   // its public /api/status) whether it gates with OAuth or a static session
   // token, so we can show the right control (login button vs token box).
@@ -226,13 +195,11 @@ export function GatewaySettings({ embedded = false }: { embedded?: boolean } = {
     }
 
     setLoading(true)
-    // Clear scope-local entry state so a token from one scope can't leak into
-    // the next when switching profiles.
     setRemoteToken('')
     setLastTest(null)
 
     desktop
-      .getConnectionConfig(scope)
+      .getConnectionConfig()
       .then(config => {
         if (cancelled) {
           return
@@ -248,8 +215,8 @@ export function GatewaySettings({ embedded = false }: { embedded?: boolean } = {
       })
 
     return () => void (cancelled = true)
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- reload on scope change only; copy is stable
-  }, [scope])
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- load once; copy is stable
+  }, [])
 
   // Debounced probe of the entered remote URL. Only runs in remote mode with a
   // syntactically plausible URL. The probe result drives whether we render the
@@ -370,10 +337,6 @@ export function GatewaySettings({ embedded = false }: { embedded?: boolean } = {
     return providers.length > 0 && providers.every(p => p.supportsPassword)
   }, [probe])
 
-  // The 'default' profile uses the global ("All profiles") connection, so the
-  // per-profile scopes are the named, non-default profiles.
-  const namedProfiles = useMemo(() => profiles.filter(profile => profile.name !== 'default'), [profiles])
-
   useEffect(() => {
     // One-directional: a saved host that isn't in the suggestions must render
     // the free-text input (rehydration). Never force custom OFF here — that
@@ -416,14 +379,12 @@ export function GatewaySettings({ embedded = false }: { embedded?: boolean } = {
     cloudConnectSeq.current += 1
     setLastTest(null)
   }, [
-    scope,
     state.mode,
     state.sshHost,
     state.sshUser,
     state.sshPort,
     state.sshKeyPath,
-    state.sshRemoteHermesPath,
-    state.sshRemoteProfile
+    state.sshRemoteHermesPath
   ])
 
   const oauthConnected = state.remoteOauthConnected
@@ -442,7 +403,6 @@ export function GatewaySettings({ embedded = false }: { embedded?: boolean } = {
 
   const payload = () => ({
     mode: state.mode,
-    profile: scope ?? undefined,
     remoteAuthMode: authMode,
     remoteToken: authMode === 'token' ? remoteToken.trim() || undefined : undefined,
     remoteUrl: trimmedUrl,
@@ -450,10 +410,7 @@ export function GatewaySettings({ embedded = false }: { embedded?: boolean } = {
     sshUser: state.sshUser.trim() || undefined,
     sshPort: state.sshPort,
     sshKeyPath: state.sshKeyPath.trim() || undefined,
-    sshRemoteHermesPath: state.sshRemoteHermesPath.trim(),
-    // Preserve an intentional blank so an existing remote-profile mapping can
-    // be cleared instead of being mistaken for an omitted field.
-    sshRemoteProfile: state.sshRemoteProfile.trim()
+    sshRemoteHermesPath: state.sshRemoteHermesPath.trim()
   })
 
   const save = async (apply: boolean) => {
@@ -539,7 +496,6 @@ export function GatewaySettings({ embedded = false }: { embedded?: boolean } = {
       // oauth mode is persisted, without yet flipping the live connection.
       const saved = await window.hermesDesktop.saveConnectionConfig({
         mode: state.mode,
-        profile: scope ?? undefined,
         remoteAuthMode: 'oauth',
         remoteUrl: trimmedUrl
       })
@@ -557,7 +513,7 @@ export function GatewaySettings({ embedded = false }: { embedded?: boolean } = {
       }
 
       if (result.connected) {
-        const refreshed = await window.hermesDesktop.getConnectionConfig(scope)
+        const refreshed = await window.hermesDesktop.getConnectionConfig()
         acceptSavedConfig(refreshed)
         notify({ kind: 'success', title: g.signedIn, message: g.connectedTo(providerLabel) })
       } else {
@@ -584,7 +540,7 @@ export function GatewaySettings({ embedded = false }: { embedded?: boolean } = {
 
     try {
       await window.hermesDesktop.oauthLogoutConnectionConfig(trimmedUrl || undefined)
-      const refreshed = await window.hermesDesktop.getConnectionConfig(scope)
+      const refreshed = await window.hermesDesktop.getConnectionConfig()
 
       if (seq !== signingSeq.current) {
         return
@@ -687,7 +643,7 @@ export function GatewaySettings({ embedded = false }: { embedded?: boolean } = {
     void discoverCloud()
   }
 
-  // On entering cloud mode (or scope change), read the portal session status and
+  // On entering cloud mode, read the portal session status and
   // auto-discover when already signed in, so the picker is populated on open.
   useEffect(() => {
     if (state.mode !== 'cloud') {
@@ -736,8 +692,8 @@ export function GatewaySettings({ embedded = false }: { embedded?: boolean } = {
       })
 
     return () => void (cancelled = true)
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- reload on mode/scope change only
-  }, [state.mode, scope])
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- reload on mode change only
+  }, [state.mode])
 
   const cloudSignIn = async () => {
     const desktop = window.hermesDesktop
@@ -847,7 +803,6 @@ export function GatewaySettings({ embedded = false }: { embedded?: boolean } = {
       // discovery in this same render tick is captured, not a stale null.
       const next = await desktop.applyConnectionConfig({
         mode: 'cloud',
-        profile: scope ?? undefined,
         remoteAuthMode: 'oauth',
         remoteUrl: agent.dashboardUrl,
         cloudOrg: cloudOrgRef.current ?? undefined
@@ -976,7 +931,6 @@ export function GatewaySettings({ embedded = false }: { embedded?: boolean } = {
     try {
       const result = await window.hermesDesktop.testConnectionConfig({
         mode: 'remote',
-        profile: scope ?? undefined,
         remoteAuthMode: authMode,
         remoteToken: authMode === 'token' ? remoteToken.trim() || undefined : undefined,
         remoteUrl: trimmedUrl
@@ -1030,28 +984,6 @@ export function GatewaySettings({ embedded = false }: { embedded?: boolean } = {
         </div>
       )}
 
-      {namedProfiles.length > 0 ? (
-        <div className="mb-5 grid gap-2">
-          <div className="text-[length:var(--conversation-caption-font-size)] font-medium text-(--ui-text-secondary)">
-            {g.appliesTo}
-          </div>
-          <div className="flex flex-wrap gap-1.5">
-            <ScopeChip active={scope === null} label={g.allProfiles} onSelect={() => setScope(null)} />
-            {namedProfiles.map(profile => (
-              <ScopeChip
-                active={scope === profile.name}
-                key={profile.name}
-                label={profile.name}
-                onSelect={() => setScope(profile.name)}
-              />
-            ))}
-          </div>
-          <p className="text-[length:var(--conversation-caption-font-size)] leading-(--conversation-caption-line-height) text-(--ui-text-tertiary)">
-            {scope === null ? g.defaultConnection : g.profileConnection(scope)}
-          </p>
-        </div>
-      ) : null}
-
       {state.envOverride ? (
         <div className="mb-5 flex items-start gap-2 rounded-xl border border-destructive/30 bg-destructive/10 px-3 py-2.5 text-[length:var(--conversation-caption-font-size)] text-destructive">
           <AlertCircle className="mt-0.5 size-4 shrink-0" />
@@ -1069,11 +1001,11 @@ export function GatewaySettings({ embedded = false }: { embedded?: boolean } = {
         <div className="grid auto-rows-fr grid-cols-1 gap-2 sm:grid-cols-2 min-[72rem]:grid-cols-4">
           <ModeCard
             active={state.mode === 'local'}
-            description={scope === null ? g.localDesc : g.inheritDesc}
+            description={g.localDesc}
             disabled={state.envOverride}
             icon={Monitor}
             onSelect={() => setState(current => ({ ...current, mode: 'local' }))}
-            title={scope === null ? g.localTitle : g.inheritTitle}
+            title={g.localTitle}
           />
           <ModeCard
             active={state.mode === 'cloud'}
@@ -1438,20 +1370,6 @@ export function GatewaySettings({ embedded = false }: { embedded?: boolean } = {
             description={g.sshHermesPathDesc}
             title={g.sshHermesPathTitle}
           />
-          {scope !== null ? (
-            <ListRow
-              action={
-                <Input
-                  className={cn('h-8 font-mono', CONTROL_TEXT)}
-                  onChange={event => setState(current => ({ ...current, sshRemoteProfile: event.target.value }))}
-                  placeholder={scope}
-                  value={state.sshRemoteProfile}
-                />
-              }
-              description={g.sshRemoteProfileDesc}
-              title={g.sshRemoteProfileTitle}
-            />
-          ) : null}
         </div>
       ) : null}
 

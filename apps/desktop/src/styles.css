@@ -136,6 +136,18 @@
   :root {
     color-scheme: light;
 
+    /* In-app glass is intentionally separate from native window transparency.
+       These values affect static chrome only; the live chat timeline never gets
+       a backdrop filter because it repaints during streaming. */
+    --glass-blur: 0.6875rem;
+    --glass-saturation: 1.08;
+    --glass-chrome-opacity: 92%;
+    --glass-sidebar-opacity: 94%;
+    --glass-elevated-opacity: 88%;
+    --glass-composer-opacity: 80%;
+    --glass-composer-panel-opacity: 72%;
+    --glass-border-color: color-mix(in srgb, var(--ui-stroke-secondary) 86%, transparent);
+
     --theme-foreground: #17171a;
     --theme-primary: #0053fd;
     --theme-secondary: color-mix(in srgb, #0053fd 7%, #ffffff);
@@ -404,10 +416,9 @@
     --dt-spacing-mul: 1;
 
     --radius: 0.75rem;
-    /* Shared corner scale. A value below 1 keeps compact desktop controls from
-       becoming pill-like while still giving buttons, rows, cards, and floating
-       surfaces the same visibly softened geometry. */
-    --radius-scalar: 0.8;
+    /* Shared corner scale. Keep every control, row, card, and pane on the full
+       system curve so the app reads as one consistently rounded surface. */
+    --radius-scalar: 1;
 
     /* Space under last message vs overlay composer — driven by the measured composer DOCK height (see
        composer/index.tsx), which covers the micro-action strip, the status stack, the composer, and the
@@ -440,7 +451,6 @@
        markdown block and between consecutive prose parts. Single knob; tweak
        freely. */
     --paragraph-gap: 0.7rem;
-    --sticky-human-top: 0.23rem;
     --file-tree-row-height: 1.375rem;
 
     --composer-width: 48.75rem;
@@ -493,7 +503,6 @@
     --warm-glow: color-mix(in srgb, var(--ui-warm) 32%, color-mix(in srgb, var(--ui-accent) 6%, transparent));
     /* `--noise-opacity-mul` is set per-mode by `applyTheme()`. */
     --noise-opacity-mul: 1;
-    --backdrop-invert-mul: 1;
   }
 
   :root.dark {
@@ -515,7 +524,6 @@
 
     --sidebar-edge-border: color-mix(in srgb, var(--ui-base) 12%, transparent);
     --composer-ring-strength: 1.3;
-    --backdrop-invert-mul: 0;
     /* Dark mode: a dark card needs a stronger black inset to show the recess. */
     --dt-input-inset: inset 0 1px 1px color-mix(in srgb, #000 38%, transparent);
     --ui-tab-hover-darken: 6%;
@@ -1010,14 +1018,85 @@ button {
    the variants. */
 
 [data-slot='dropdown-menu-content'],
+[data-slot='dropdown-menu-sub-content'],
 [data-slot='select-content'],
 [data-slot='dialog-content'],
+[data-slot='context-menu-content'],
+[data-slot='context-menu-sub-content'],
+[data-slot='popover-content'],
 [data-slot='thread-timeline-popover'] {
-  border-color: var(--ui-stroke-secondary);
-  background: color-mix(in srgb, var(--ui-bg-elevated) 96%, transparent);
+  border-color: var(--glass-border-color);
+  background: color-mix(in srgb, var(--ui-bg-elevated) var(--glass-elevated-opacity), transparent);
   box-shadow: var(--shadow-md);
-  backdrop-filter: blur(0.75rem) saturate(1.08);
-  -webkit-backdrop-filter: blur(0.75rem) saturate(1.08);
+  backdrop-filter: blur(var(--glass-blur)) saturate(var(--glass-saturation));
+  -webkit-backdrop-filter: blur(var(--glass-blur)) saturate(var(--glass-saturation));
+}
+
+/* Shared static-surface treatment. Keep this opt-in by class rather than
+   attaching it to every card: backdrop filters are expensive on scrolling or
+   continuously repainting content. */
+.glass-chrome {
+  background: color-mix(in srgb, var(--ui-chat-surface-background) var(--glass-chrome-opacity), transparent);
+  backdrop-filter: blur(var(--glass-blur)) saturate(var(--glass-saturation));
+  -webkit-backdrop-filter: blur(var(--glass-blur)) saturate(var(--glass-saturation));
+}
+
+.glass-sidebar {
+  background: color-mix(in srgb, var(--ui-sidebar-surface-background) var(--glass-sidebar-opacity), transparent);
+  backdrop-filter: blur(var(--glass-blur)) saturate(var(--glass-saturation));
+  -webkit-backdrop-filter: blur(var(--glass-blur)) saturate(var(--glass-saturation));
+}
+
+.glass-elevated {
+  background: color-mix(in srgb, var(--ui-bg-elevated) var(--glass-elevated-opacity), transparent);
+  backdrop-filter: blur(var(--glass-blur)) saturate(var(--glass-saturation));
+  -webkit-backdrop-filter: blur(var(--glass-blur)) saturate(var(--glass-saturation));
+}
+
+/* The composer remains translucent, but must never resample the streaming
+   transcript behind it. Small menus and floating controls can safely blur. */
+.glass-composer-surface {
+  background: color-mix(in srgb, var(--composer-fill) var(--glass-composer-opacity), transparent);
+}
+
+.glass-composer-panel {
+  background: color-mix(in srgb, var(--dt-card) var(--glass-composer-panel-opacity), transparent);
+  backdrop-filter: blur(var(--glass-blur)) saturate(var(--glass-saturation));
+  -webkit-backdrop-filter: blur(var(--glass-blur)) saturate(var(--glass-saturation));
+}
+
+.glass-composer-pill {
+  background: color-mix(in srgb, var(--composer-fill) var(--glass-composer-opacity), transparent);
+  backdrop-filter: blur(var(--glass-blur)) saturate(var(--glass-saturation));
+  -webkit-backdrop-filter: blur(var(--glass-blur)) saturate(var(--glass-saturation));
+}
+
+.glass-popover-arrow {
+  background: color-mix(in srgb, var(--ui-bg-elevated) var(--glass-elevated-opacity), transparent);
+  backdrop-filter: blur(var(--glass-blur)) saturate(var(--glass-saturation));
+  -webkit-backdrop-filter: blur(var(--glass-blur)) saturate(var(--glass-saturation));
+}
+
+:root[data-hermes-glass='solid'] {
+  --glass-blur: 0px;
+  --glass-saturation: 1;
+  --glass-chrome-opacity: 100%;
+  --glass-sidebar-opacity: 100%;
+  --glass-elevated-opacity: 100%;
+  --glass-composer-opacity: 100%;
+  --glass-composer-panel-opacity: 100%;
+  --glass-border-color: var(--ui-stroke-secondary);
+}
+
+:root[data-hermes-glass='frosted'] {
+  --glass-blur: 1rem;
+  --glass-saturation: 1.14;
+  --glass-chrome-opacity: 82%;
+  --glass-sidebar-opacity: 84%;
+  --glass-elevated-opacity: 74%;
+  --glass-composer-opacity: 70%;
+  --glass-composer-panel-opacity: 64%;
+  --glass-border-color: color-mix(in srgb, var(--ui-stroke-secondary) 68%, transparent);
 }
 
 [data-slot='dropdown-menu-item']:focus,
@@ -1404,10 +1483,6 @@ code {
   text-align: left;
 }
 
-[data-slot='aui_user-message-root'] {
-  top: var(--sticky-human-top);
-}
-
 [data-slot='aui_user-message-root'],
 [data-slot='aui_edit-composer-root'] {
   --human-msg-line-height: 1.3;
@@ -1422,24 +1497,21 @@ code {
   line-height: var(--human-msg-line-height);
 }
 
-/* Sticky human bubbles clamp to ~2 lines with a soft bottom fade so a long
-   prompt doesn't dominate the viewport. The clamp lifts only in the edit
-   composer; expanding on read-only :focus-within ran on mousedown (before the
-   swap) and fought stick-to-bottom when parked at the bottom. */
-.sticky-human-clamp {
+/* Human prompts clamp with a soft bottom fade so long text stays compact in
+   the transcript. Editing still exposes the complete prompt. */
+.user-message-clamp {
   cursor: pointer;
   max-height: calc(4 * var(--human-msg-line-height) * var(--conversation-text-font-size) + 0.15rem);
   overflow: hidden;
 }
 
-.sticky-human-clamp[data-clamped='true'] {
+.user-message-clamp[data-clamped='true'] {
   -webkit-mask-image: linear-gradient(to bottom, #000 55%, transparent);
   mask-image: linear-gradient(to bottom, #000 55%, transparent);
 }
 
-/* Stick-to-bottom owns scrollTop while following. Once escaped, native anchoring
-   is safe and keeps sticky human edits from shoving the viewport; data-editing
-   enables that path before React swaps in the inline editor. */
+/* Stick-to-bottom owns scrollTop while following. Once escaped, native
+   anchoring is safe during inline edits. */
 [data-slot='aui_thread-viewport'] {
   overflow-anchor: none;
 }

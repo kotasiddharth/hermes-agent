@@ -50,7 +50,6 @@ import {
   SlidersHorizontal,
   Starmap,
   Sun,
-  Users,
   Wrench,
   Zap
 } from '@/lib/icons'
@@ -92,7 +91,6 @@ import {
   MESSAGING_ROUTE,
   navigateToWorkspacePage,
   NEW_CHAT_ROUTE,
-  PROFILES_ROUTE,
   SETTINGS_ROUTE,
   SKILLS_ROUTE,
   STARMAP_ROUTE
@@ -792,7 +790,6 @@ function CommandPaletteBody({ onExited }: { onExited: () => void }) {
             label: t.shell.statusbar.cron,
             run: go(CRON_ROUTE)
           },
-          { action: 'nav.profiles', icon: Users, id: 'nav-profiles', label: t.profiles.title, run: go(PROFILES_ROUTE) },
           { action: 'nav.agents', icon: Cpu, id: 'nav-agents', label: t.agents.title, run: go(AGENTS_ROUTE) },
           {
             icon: Starmap,

@@ -227,7 +227,7 @@ const StatusbarItemView = memo(function StatusbarItemView({
     // but DropdownMenu's Root renders no element, so the hover listeners never
     // land on the button and the tooltip silently never shows. Compose the two
     // trigger Slots directly onto the same <button> instead (both asChild), the
-    // way profile-switcher.tsx stacks Popover/ContextMenu/Tooltip triggers.
+    // way nested Popover/ContextMenu/Tooltip triggers compose.
     const trigger = (
       <DropdownMenuTrigger asChild>
         <button className={cn(STATUSBAR_ACTION_CLASS, item.className)} disabled={item.disabled} type="button">

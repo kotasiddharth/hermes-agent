@@ -58,6 +58,7 @@ import type {
   SkillHubScanResult,
   SkillHubSearchResponse,
   SkillHubSourcesResponse,
+  SkillHubTapsResponse,
   SkillInfo,
   StarmapGraph,
   StatusResponse,
@@ -211,6 +212,8 @@ export type {
   SkillHubSearchResponse,
   SkillHubSource,
   SkillHubSourcesResponse,
+  SkillHubTap,
+  SkillHubTapsResponse,
   SkillInfo,
   StaleAuxAssignment,
   StarmapGraph,
@@ -1703,6 +1706,31 @@ export function getSkillHubSources(): Promise<SkillHubSourcesResponse> {
     ...profileScoped(),
     path: '/api/skills/hub/sources',
     timeoutMs: HUB_REQUEST_TIMEOUT_MS
+  })
+}
+
+export function getSkillHubTaps(): Promise<SkillHubTapsResponse> {
+  return window.hermesDesktop.api<SkillHubTapsResponse>({
+    ...profileScoped(),
+    path: '/api/skills/hub/taps'
+  })
+}
+
+export function addSkillHubTap(repo: string): Promise<{ added: boolean; ok: boolean; repo: string }> {
+  return window.hermesDesktop.api<{ added: boolean; ok: boolean; repo: string }>({
+    ...profileScoped(),
+    path: '/api/skills/hub/taps',
+    method: 'POST',
+    body: { repo }
+  })
+}
+
+export function removeSkillHubTap(repo: string): Promise<{ ok: boolean; removed: boolean; repo: string }> {
+  return window.hermesDesktop.api<{ ok: boolean; removed: boolean; repo: string }>({
+    ...profileScoped(),
+    path: '/api/skills/hub/taps',
+    method: 'DELETE',
+    body: { repo }
   })
 }
 

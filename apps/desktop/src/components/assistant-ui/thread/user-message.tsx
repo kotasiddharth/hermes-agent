@@ -23,7 +23,7 @@ export function hasTextSelection(): boolean {
   return Boolean(selection && !selection.isCollapsed && selection.toString().length > 0)
 }
 
-export function StickyHumanMessageContainer({
+export function HumanMessageContainer({
   attachments,
   children,
   messageId
@@ -33,13 +33,12 @@ export function StickyHumanMessageContainer({
   messageId?: string
 }) {
   return (
-    // Fragment, not a wrapper: a wrapping element becomes the sticky's
-    // containing block (it'd stick within its own height = never). The bubble
-    // and attachments are flow siblings so the bubble pins against the scroller
-    // while attachments below it scroll away.
+    // The prompt and its attachments stay in normal document flow. A prior
+    // version made the prompt sticky, which repeated it above the response being
+    // read; the side timeline now provides the lightweight history cue instead.
     <>
       <div
-        className="group/user-message sticky z-40 -mx-4 flex w-[calc(100%+2rem)] min-w-0 max-w-none flex-col items-stretch gap-0 self-end overflow-visible bg-(--ui-chat-surface-background) px-4 pb-(--conversation-turn-gap) pt-1"
+        className="group/user-message flex w-full min-w-0 max-w-full flex-col items-stretch gap-0 self-end overflow-visible pb-(--conversation-turn-gap) pt-1"
         data-message-id={messageId}
         data-role="user"
         data-slot="aui_user-message-root"
@@ -56,11 +55,8 @@ export function StickyHumanMessageContainer({
 // they only differ in border weight, cursor, and padding-right (the
 // read-only view reserves room for the restore icon).
 //
-// no-drag: sticky bubbles park at --sticky-human-top (~4px), sliding under the
-// titlebar's [-webkit-app-region:drag] strips (app-shell.tsx). Electron resolves
-// drag regions at the compositor level — z-index and pointer-events don't help —
-// so without the carve-out, clicking a stuck bubble drags the window instead of
-// opening the edit composer.
+// no-drag keeps prompt editing reliable if a message appears beneath a native
+// titlebar drag region in a secondary window.
 export const USER_BUBBLE_BASE_CLASS =
   'composer-human-message standalone-glass relative flex w-full min-w-0 max-w-full flex-col gap-1.5 overflow-y-auto rounded-xl border bg-(--dt-user-bubble) px-3 py-2 text-left [-webkit-app-region:no-drag]'
 
@@ -164,9 +160,9 @@ export const UserMessage: FC<{
     [react]
   )
 
-  // Sticky human bubbles clamp to ~2 lines with a soft fade so a long prompt
-  // doesn't dominate the viewport while the response streams underneath; the
-  // clamp lifts on hover / focus (see styles.css). We measure the *unclamped*
+  // Long human prompts clamp with a soft fade so they don't dominate the
+  // transcript; the edit composer is always available to reveal the full text.
+  // We measure the *unclamped*
   // inner wrapper so the ResizeObserver only fires on real content / width
   // changes, not on every frame while the outer max-height animates open.
   const clampInnerRef = useRef<HTMLDivElement | null>(null)
@@ -248,7 +244,7 @@ export const UserMessage: FC<{
     // backtick `code` and ``` fenced ``` blocks, with directive chips
     // (`@file:` etc.) still resolved inside the plain-text spans.
     <div
-      className={cn(clampActive && 'sticky-human-clamp')}
+      className={cn(clampActive && 'user-message-clamp')}
       data-clamped={clampActive && bodyClamped ? 'true' : undefined}
     >
       {/* Match the edit composer's collapsed line box (min-h-[1.25rem]) so
@@ -262,11 +258,10 @@ export const UserMessage: FC<{
 
   return (
     <MessagePrimitive.Root asChild>
-      <StickyHumanMessageContainer
+      <HumanMessageContainer
         attachments={
-          // Attachments live BELOW the sticky bubble in normal flow, so they
-          // scroll away behind the pinned bubble instead of riding along with
-          // it. Image refs render as thumbnails, file refs as chips; no border.
+          // Attachments stay below the prompt in normal flow. Image refs render
+          // as thumbnails, file refs as chips; no border.
           attachmentRefs.length > 0 ? (
             <div className="flex flex-wrap gap-1 -mt-3 mb-2">
               <DirectiveContent text={attachmentRefs.join(' ')} />
@@ -432,7 +427,7 @@ export const UserMessage: FC<{
             </BranchPickerPrimitive.Root>
           </div>
         </ActionBarPrimitive.Root>
-      </StickyHumanMessageContainer>
+      </HumanMessageContainer>
     </MessagePrimitive.Root>
   )
 }

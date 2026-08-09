@@ -531,6 +531,12 @@ class SkillInstallRequest(BaseModel):
     profile: Optional[str] = None
 
 
+class SkillHubTapRequest(BaseModel):
+    """A user-owned GitHub repository exposed in the Skills Hub."""
+
+    repo: str
+
+
 # --- from web_server.py (originally lines 14724-14726) ---
 
 class SkillUninstallRequest(BaseModel):

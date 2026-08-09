@@ -1,13 +1,16 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 import {
+  addSkillHubTap,
   getCuratorStatus,
   getMcpCatalog,
   getMemoryStatus,
   getSkillHubSources,
+  getSkillHubTaps,
   getToolsetModels,
   installMcpCatalogEntry,
   installSkillFromHub,
+  removeSkillHubTap,
   resetMemory,
   runDebugShare,
   searchSkillsHub,
@@ -37,6 +40,22 @@ describe('Hermes REST parity helpers (hub / mcp / maintenance)', () => {
     await getSkillHubSources()
 
     expect(api).toHaveBeenCalledWith(expect.objectContaining({ path: '/api/skills/hub/sources', timeoutMs: 45_000 }))
+  })
+
+  it('manages GitHub skill marketplaces through the scoped hub endpoint', async () => {
+    await getSkillHubTaps()
+    await addSkillHubTap('octo/skills')
+    await removeSkillHubTap('octo/skills')
+
+    expect(api).toHaveBeenNthCalledWith(1, expect.objectContaining({ path: '/api/skills/hub/taps' }))
+    expect(api).toHaveBeenNthCalledWith(
+      2,
+      expect.objectContaining({ path: '/api/skills/hub/taps', method: 'POST', body: { repo: 'octo/skills' } })
+    )
+    expect(api).toHaveBeenNthCalledWith(
+      3,
+      expect.objectContaining({ path: '/api/skills/hub/taps', method: 'DELETE', body: { repo: 'octo/skills' } })
+    )
   })
 
   it('encodes hub search params', async () => {

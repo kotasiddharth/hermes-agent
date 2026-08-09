@@ -63,7 +63,7 @@ import {
   toggleSidebarMessagingOpen,
   unpinSession
 } from '@/store/layout'
-import { $newChatProfile, $profiles, $profileScope, ALL_PROFILES, normalizeProfileKey } from '@/store/profile'
+import { normalizeProfileKey } from '@/store/profile'
 import {
   $activeProjectId,
   $projects,
@@ -100,7 +100,7 @@ import { $focusedStoredSessionId, $workingSessionIds, type SplitDir } from '@/st
 
 import {
   type AppView,
-  ARTIFACTS_ROUTE,
+  CRON_ROUTE,
   MESSAGING_ROUTE,
   SIDEBAR_NAV_AREA,
   type SidebarNavContribution,
@@ -111,7 +111,6 @@ import type { SidebarNavItem } from '../../types'
 import { SidebarCronJobsSection } from './cron-jobs-section'
 import { SidebarLoadMoreRow } from './load-more-row'
 import { orderByIds, reconcileOrderIds, resolveManualSessionOrderIds, sameIds } from './order'
-import { ProfileRail } from './profile-switcher'
 import { ProjectDialog } from './project-dialog'
 import {
   excludeProjectSessions,
@@ -131,7 +130,7 @@ import {
   useRepoWorktreeMap
 } from './projects'
 import { WorktreeDialog } from './projects/worktree-dialog'
-import { SidebarBlankState, SidebarPinnedEmptyState, SidebarSessionSkeletons } from './section-states'
+import { SidebarBlankState, SidebarSessionSkeletons } from './section-states'
 import { buildSessionByAnyId } from './session-index'
 import { SidebarSessionsSection, VIRTUALIZE_THRESHOLD } from './sessions-section'
 import { CONTEXT_SPLIT_KIT, SplitSubmenu } from './split-submenu'
@@ -165,11 +164,11 @@ const SIDEBAR_NAV: SidebarNavItem[] = [
     keybindActionId: 'nav.messaging'
   },
   {
-    id: 'artifacts',
+    id: 'scheduled',
     label: '',
-    icon: props => <Codicon name="files" {...props} />,
-    route: ARTIFACTS_ROUTE,
-    keybindActionId: 'nav.artifacts'
+    icon: props => <Codicon name="calendar" {...props} />,
+    route: CRON_ROUTE,
+    keybindActionId: 'nav.cron'
   }
 ]
 
@@ -304,15 +303,7 @@ export function ChatSidebar({
   const sessionsLoading = useStore($sessionsLoading)
   const sessionProfilesTruncated = useStore($sessionProfilesTruncated)
   const workingSessionIds = useStore($workingSessionIds)
-  const profiles = useStore($profiles)
-  const profileScope = useStore($profileScope)
-  // Only surface the profile switcher when more than one profile exists, so
-  // single-profile users see the unchanged sidebar.
-  const multiProfile = profiles.length > 1
-  // Gate ALL-profiles grouping on multiProfile too: if a user drops back to one
-  // profile while scope is still ALL (persisted), the rail is hidden and they'd
-  // otherwise be stuck in the grouped view with no way out.
-  const showAllProfiles = multiProfile && profileScope === ALL_PROFILES
+  const showAllProfiles = false
   const agentOrderIds = useStore($sidebarSessionOrderIds)
   const agentOrderManual = useStore($sidebarSessionOrderManual)
   const workspaceOrderIds = useStore($sidebarWorkspaceOrderIds)
@@ -378,13 +369,11 @@ export function ChatSidebar({
     useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates })
   )
 
-  // Profile scope = the "workspace switcher" context. Concrete scope shows only
-  // that profile's sessions (clean rows, no per-row tags); ALL fans every
-  // profile in, grouped by profile below. Single-profile users land here with
-  // scope === their only profile, so nothing is filtered out.
+  // Runtime workspaces stay invisible here: the session history is one flat
+  // list, with any routing needed to resume a session handled in the background.
   const visibleSessions = useMemo(
-    () => (showAllProfiles ? sessions : sessions.filter(s => normalizeProfileKey(s.profile) === profileScope)),
-    [sessions, showAllProfiles, profileScope]
+    () => sessions,
+    [sessions]
   )
 
   // Recents by activity (last_active || started_at). User send stamps
@@ -570,7 +559,7 @@ export function ChatSidebar({
       // of the crawl blocking the first render.
       void refreshProjectTree().finally(() => void scanAndRecordRepos())
     }
-  }, [worktreeGroupingActive, profileScope, gatewayReady])
+  }, [worktreeGroupingActive, gatewayReady])
 
   // Out-of-band repo changes (a `git init` / `rm -rf` in another terminal) emit
   // no git events, so — like every git GUI — re-pull on window focus / tab
@@ -1012,11 +1001,9 @@ export function ChatSidebar({
   // flag — otherwise a huge default profile keeps "Load more" stuck on while
   // you browse a small one. The backend reports whether its page was capped
   // rather than an exact count, so no COUNT(*) runs per refresh.
-  const loadedSessionCount = showAllProfiles ? sessions.length : visibleSessions.length
+  const loadedSessionCount = visibleSessions.length
 
-  const hasMoreSessions = showAllProfiles
-    ? Object.values(sessionProfilesTruncated).some(Boolean)
-    : Boolean(sessionProfilesTruncated[profileScope])
+  const hasMoreSessions = Object.values(sessionProfilesTruncated).some(Boolean)
 
   const displayRecentsCountRef = useRef(0)
   const loadedRecentsCountRef = useRef(0)
@@ -1140,7 +1127,7 @@ export function ChatSidebar({
         // paints itself fully.
         'relative h-full min-w-0 overflow-hidden border-t-0 border-b-0 text-foreground transition-none',
         panesFlipped ? 'border-l border-r-0' : 'border-r border-l-0',
-        'border-(--sidebar-edge-border) bg-(--ui-sidebar-surface-background) opacity-100'
+        'glass-sidebar border-(--sidebar-edge-border) opacity-100'
       )}
       collapsible="none"
     >
@@ -1154,7 +1141,6 @@ export function ChatSidebar({
                 const active =
                   (item.id === 'skills' && currentView === 'skills') ||
                   (item.id === 'messaging' && currentView === 'messaging') ||
-                  (item.id === 'artifacts' && currentView === 'artifacts') ||
                   // Contributed rows light up at their own route.
                   (Boolean(item.route) && pathname === item.route)
 
@@ -1182,10 +1168,6 @@ export function ChatSidebar({
                       // gateway is on (= the active switcher context). null →
                       // no swap. The switcher header is the single place to
                       // change which profile that is.
-                      if (isNewSession) {
-                        $newChatProfile.set(null)
-                      }
-
                       onNavigate(item)
                     }}
                     tooltip={
@@ -1280,17 +1262,16 @@ export function ChatSidebar({
                 pinned={false}
                 rootClassName="min-h-32 flex-1 overflow-hidden p-0"
                 sessions={searchResults}
-                showProfileTags={showAllProfiles}
                 workingSessionIdSet={workingSessionIdSet}
               />
             )}
 
-            {!trimmedQuery && (
+            {!trimmedQuery && pinnedSessions.length > 0 && (
               <SidebarSessionsSection
                 activeSessionId={activeSidebarSessionId}
                 contentClassName="flex flex-col gap-px rounded-lg pb-2 pt-1"
                 dndSensors={dndSensors}
-                emptyState={<SidebarPinnedEmptyState />}
+                emptyState={null}
                 label={s.pinned}
                 onArchiveSession={onArchiveSession}
                 onBranchSession={onBranchSession}
@@ -1303,7 +1284,6 @@ export function ChatSidebar({
                 pinned
                 rootClassName="shrink-0 p-0 pb-1"
                 sessions={pinnedSessions}
-                showProfileTags={showAllProfiles}
                 sortable={pinnedSessions.length > 1}
                 workingSessionIdSet={workingSessionIdSet}
               />
@@ -1533,9 +1513,6 @@ export function ChatSidebar({
 
         {!showSessionSections && <SidebarBlankState onNewProject={openProjectCreate} />}
 
-        <div className="shrink-0 px-0.5 pb-1 pt-0.5">
-          <ProfileRail />
-        </div>
       </SidebarContent>
       <ProjectDialog />
       {/* One mount for the whole app. The header of WorktreeDialog tells why. */}

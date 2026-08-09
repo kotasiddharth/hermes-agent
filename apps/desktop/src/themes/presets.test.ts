@@ -30,4 +30,17 @@ describe('theme typography emoji fallback (#40364)', () => {
     expect(EMOJI_FALLBACK).toContain('Segoe UI Emoji')
     expect(EMOJI_FALLBACK).toContain('Noto Color Emoji')
   })
+
+  it('ships solid two-tone themes with a distinct chat and sidebar surface', () => {
+    const names = ['graphite', 'tide', 'moss', 'plum']
+    const themes = BUILTIN_THEME_LIST.filter(theme => names.includes(theme.name))
+
+    expect(themes.map(theme => theme.name)).toEqual(names)
+
+    for (const theme of themes) {
+      expect(theme.colors.card).toBe(theme.colors.background)
+      expect(theme.colors.sidebarBackground).not.toBe(theme.colors.background)
+      expect(theme.colors.userBubble).toBe(theme.colors.sidebarBackground)
+    }
+  })
 })

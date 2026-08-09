@@ -6,8 +6,6 @@ import { runInTerminal } from '@/app/right-sidebar/store'
 import {
   FEATURED_ID,
   FeaturedProviderRow,
-  FireworksProviderRow,
-  OpenRouterProviderRow,
   ProviderRow,
   providerTitle,
   sortProviders
@@ -114,26 +112,17 @@ function buildProviderKeyGroups(vars: Record<string, EnvVarInfo>): ProviderKeyGr
   return groups.sort((a, b) => a.priority - b.priority || a.name.localeCompare(b.name))
 }
 
-// Deliberately a near-1:1 replica of the first-run onboarding picker
-// (`Picker` in desktop-onboarding-overlay): same recommended card, same
-// Fireworks #2 quick-key row, same provider rows, same "Other providers"
-// disclosure, same OpenRouter quick-key row, and the same bottom-right
-// "I have an API key" affordance. The leaf cards are the exact shared
-// components, so the two surfaces stay visually identical. Selecting a
-// provider hands off to the shared onboarding overlay, which runs that
-// provider's real sign-in flow; the key affordances open the API-key
-// catalog below.
+// Accounts is intentionally limited to browser/CLI sign-ins. API-key
+// configuration lives exclusively in the sibling API Keys view.
 function OAuthPicker({
   disconnecting,
   onDisconnect,
   onTerminalDisconnect,
-  onWantApiKey,
   providers
 }: {
   disconnecting: null | string
   onDisconnect: (provider: OAuthProvider) => void
   onTerminalDisconnect: (provider: OAuthProvider) => void
-  onWantApiKey: () => void
   providers: OAuthProvider[]
 }) {
   const { t } = useI18n()
@@ -142,7 +131,11 @@ function OAuthPicker({
   const ordered = useMemo(() => sortProviders(providers), [providers])
 
   if (ordered.length === 0) {
-    return null
+    return (
+      <div className="grid min-h-32 place-items-center px-4 py-8 text-center text-[length:var(--conversation-caption-font-size)] text-muted-foreground">
+        {p.noAccounts}
+      </div>
+    )
   }
 
   const select = (p: OAuthProvider) => startManualProviderOAuth(p.id)
@@ -161,22 +154,12 @@ function OAuthPicker({
     <section className="mb-5 grid gap-2">
       <div className="flex flex-wrap items-baseline justify-between gap-x-3">
         <SettingsCategoryHeading icon={KeyRound} title={p.connectAccount} />
-        <Button
-          className="text-[length:var(--conversation-caption-font-size)]"
-          onClick={onWantApiKey}
-          size="inline"
-          type="button"
-          variant="textStrong"
-        >
-          {p.haveApiKey}
-        </Button>
       </div>
       <p className="-mt-2 mb-1 text-[length:var(--conversation-caption-font-size)] leading-(--conversation-caption-line-height) text-(--ui-text-tertiary)">
         {p.intro}
       </p>
       {featured && <FeaturedProviderRow onSelect={select} provider={featured} />}
       {/* Slot #2 — always visible, matching onboarding / CANONICAL_PROVIDERS. */}
-      <FireworksProviderRow onClick={onWantApiKey} />
       {connected.length > 0 && (
         <>
           <GroupLabel>{p.connected}</GroupLabel>
@@ -198,7 +181,6 @@ function OAuthPicker({
           {others.map(p => (
             <ProviderRow key={p.id} onSelect={select} provider={p} />
           ))}
-          <OpenRouterProviderRow onClick={onWantApiKey} />
         </>
       )}
       {collapsible && (
@@ -335,7 +317,6 @@ export function ProvidersSettings({
   onClose,
   onConfigSaved,
   onMainModelChanged,
-  onViewChange,
   view
 }: ProvidersSettingsProps) {
   const { t } = useI18n()
@@ -434,10 +415,7 @@ export function ProvidersSettings({
     return <SettingsSkeleton search sections={[{ rows: 6 }]} />
   }
 
-  const hasOauth = oauthProviders.length > 0
-  // The sidebar subnav owns the Accounts/API-keys split now; with no OAuth
-  // providers there's nothing for the "Accounts" view to show, so fall to keys.
-  const showApiKeys = view === 'keys' || (!hasOauth && view !== 'custom-endpoints')
+  const showApiKeys = view === 'keys'
 
   const keyGroups = buildProviderKeyGroups(vars)
 
@@ -500,7 +478,6 @@ export function ProvidersSettings({
         disconnecting={disconnecting}
         onDisconnect={provider => void handleDisconnect(provider)}
         onTerminalDisconnect={handleTerminalDisconnect}
-        onWantApiKey={() => onViewChange('keys')}
         providers={oauthProviders}
       />
     </SettingsContent>
@@ -521,6 +498,5 @@ interface ProvidersSettingsProps {
   onClose: () => void
   onConfigSaved?: () => void
   onMainModelChanged?: (provider: string, model: string) => void
-  onViewChange: (view: ProviderView) => void
   view: ProviderView
 }

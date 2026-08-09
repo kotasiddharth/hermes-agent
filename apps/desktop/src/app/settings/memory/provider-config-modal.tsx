@@ -1,4 +1,3 @@
-import { useStore } from '@nanostores/react'
 import { useEffect, useState } from 'react'
 
 import { Button } from '@/components/ui/button'
@@ -14,7 +13,6 @@ import {
 import { saveMemoryProviderConfig } from '@/hermes'
 import { ExternalLink, Loader2, Save, SlidersHorizontal } from '@/lib/icons'
 import { notify, notifyError } from '@/store/notifications'
-import { $activeGatewayProfile } from '@/store/profile'
 import type { MemoryProviderConfig, MemoryProviderField } from '@/types/hermes'
 
 import { ListRow } from '../primitives'
@@ -57,7 +55,6 @@ export function ProviderConfigModal({
   onOpenChange: (open: boolean) => void
   onSaved: () => Promise<void> | void
 }) {
-  const activeProfile = useStore($activeGatewayProfile)
   const [values, setValues] = useState<Record<string, string>>({})
   const [seeded, setSeeded] = useState<Record<string, string>>({})
   const [saving, setSaving] = useState(false)
@@ -95,8 +92,8 @@ export function ProviderConfigModal({
         <DialogHeader>
           <DialogTitle icon={SlidersHorizontal}>{config.label} — full configuration</DialogTitle>
           <DialogDescription>
-            Every {config.label} option for the <span className="font-medium">{activeProfile}</span> profile. Blank
-            fields fall back to the resolved host or built-in default.
+            Every {config.label} option for this connection. Blank fields fall back to the resolved host or built-in
+            default.
           </DialogDescription>
           {config.docs_url && (
             <a

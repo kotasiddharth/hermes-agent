@@ -10,7 +10,6 @@ import { Tip, TipKeybindLabel } from '@/components/ui/tooltip'
 import { useI18n } from '@/i18n'
 import { triggerHaptic } from '@/lib/haptics'
 import { cn } from '@/lib/utils'
-import { $hapticsMuted, toggleHapticsMuted } from '@/store/haptics'
 import {
   $fileBrowserOpen,
   $sidebarOpen,
@@ -19,7 +18,7 @@ import {
   toggleSidebarOpen
 } from '@/store/layout'
 
-import { appViewForPath, isOverlayView, SETTINGS_ROUTE } from '../routes'
+import { appViewForPath, isOverlayView } from '../routes'
 
 import { titlebarButtonClass } from './titlebar'
 
@@ -99,21 +98,8 @@ export function TitlebarControls({ leftTools = [], tools = [], onOpenSettings }:
   const navigate = useNavigate()
   const location = useLocation()
   const modHeld = useModifierHeld()
-  const hapticsMuted = useStore($hapticsMuted)
   const fileBrowserOpen = useStore($fileBrowserOpen)
   const sidebarOpen = useStore($sidebarOpen)
-
-  const toggleHaptics = () => {
-    if (!hapticsMuted) {
-      triggerHaptic('tap')
-    }
-
-    toggleHapticsMuted()
-
-    if (hapticsMuted) {
-      window.requestAnimationFrame(() => triggerHaptic('success'))
-    }
-  }
 
   // POSITIONAL toggles: each button shows/hides everything on its physical
   // side of the main zone (the layout tree collapses the whole side), so they
@@ -179,23 +165,6 @@ export function TitlebarControls({ leftTools = [], tools = [], onOpenSettings }:
         toggleLayoutEditMode()
       },
       title: t.titlebar.layoutEditorTitle
-    },
-    {
-      active: hapticsMuted,
-      icon: <Codicon name={hapticsMuted ? 'mute' : 'unmute'} />,
-      id: 'haptics',
-      label: hapticsMuted ? t.titlebar.unmuteHaptics : t.titlebar.muteHaptics,
-      onSelect: toggleHaptics
-    },
-    {
-      actionId: 'keybinds.openPanel',
-      icon: <Codicon name="keyboard" />,
-      id: 'keybinds',
-      label: t.titlebar.openKeybinds,
-      onSelect: () => {
-        triggerHaptic('open')
-        navigate(`${SETTINGS_ROUTE}?tab=keybinds`)
-      }
     },
     {
       actionId: 'nav.settings',

@@ -634,6 +634,50 @@ class TestSkillsHubSourcesEndpoint:
         assert body["featured"][0]["trust_level"] == "trusted"
         assert isinstance(body["installed"], dict)
 
+    def test_taps_add_list_and_remove_github_marketplaces(self, monkeypatch):
+        class _Taps:
+            rows = []
+
+            def list_taps(self):
+                return list(self.rows)
+
+            def add(self, repo):
+                if any(row["repo"] == repo for row in self.rows):
+                    return False
+                self.rows.append({"repo": repo, "path": "skills/"})
+                return True
+
+            def remove(self, repo):
+                before = len(self.rows)
+                self.rows[:] = [row for row in self.rows if row["repo"] != repo]
+                return len(self.rows) != before
+
+        monkeypatch.setattr("tools.skills_hub.TapsManager", _Taps)
+
+        created = self.client.post(
+            "/api/skills/hub/taps",
+            json={"repo": "https://github.com/acme/skills.git"},
+        )
+        assert created.status_code == 200
+        assert created.json() == {"ok": True, "added": True, "repo": "acme/skills"}
+
+        listed = self.client.get("/api/skills/hub/taps")
+        assert listed.status_code == 200
+        assert listed.json()["taps"] == [{"repo": "acme/skills", "path": "skills/"}]
+
+        removed = self.client.request(
+            "DELETE", "/api/skills/hub/taps", json={"repo": "acme/skills"}
+        )
+        assert removed.status_code == 200
+        assert removed.json() == {"ok": True, "removed": True, "repo": "acme/skills"}
+
+    def test_taps_reject_non_github_urls(self):
+        response = self.client.post(
+            "/api/skills/hub/taps",
+            json={"repo": "https://example.com/skills"},
+        )
+        assert response.status_code == 400
+
 
 class TestSkillsHubPreviewEndpoint:
     @pytest.fixture(autouse=True)

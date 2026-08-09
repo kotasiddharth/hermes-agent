@@ -77,7 +77,7 @@ async function renderProvidersSettings() {
   const { ProvidersSettings } = await import('./providers-settings')
   let result: ReturnType<typeof render>
   await act(async () => {
-    result = render(<ProvidersSettings onClose={vi.fn()} onViewChange={vi.fn()} view="accounts" />)
+    result = render(<ProvidersSettings onClose={vi.fn()} view="accounts" />)
   })
 
   return result!
@@ -105,6 +105,19 @@ describe('ProvidersSettings', () => {
 
     expect(startManualProviderOAuth).toHaveBeenCalledWith('nous')
     expect(disconnectOAuthProvider).not.toHaveBeenCalled()
+  })
+
+  it('keeps API-key configuration out of the Accounts view', async () => {
+    getEnvVars.mockResolvedValue({
+      WIDGETAI_API_KEY: keyVar({ provider: 'widgetai', provider_label: 'WidgetAI' })
+    })
+    listOAuthProviders.mockResolvedValue({ providers: [] })
+
+    await renderProvidersSettings()
+
+    expect(await screen.findByText('No sign-in accounts are available.')).toBeTruthy()
+    expect(screen.queryByText('WidgetAI')).toBeNull()
+    expect(screen.queryByText('Local / custom endpoint')).toBeNull()
   })
 
   it('does not offer removal for externally managed providers', async () => {
@@ -143,7 +156,7 @@ describe('ProvidersSettings', () => {
 
     const { ProvidersSettings } = await import('./providers-settings')
     await act(async () => {
-      render(<ProvidersSettings onClose={vi.fn()} onViewChange={vi.fn()} view="keys" />)
+      render(<ProvidersSettings onClose={vi.fn()} view="keys" />)
     })
 
     expect(await screen.findByText('WidgetAI')).toBeTruthy()
@@ -161,7 +174,7 @@ describe('ProvidersSettings', () => {
     listOAuthProviders.mockResolvedValue({ providers: [] })
 
     const { ProvidersSettings } = await import('./providers-settings')
-    render(<ProvidersSettings onClose={vi.fn()} onViewChange={vi.fn()} view="keys" />)
+    render(<ProvidersSettings onClose={vi.fn()} view="keys" />)
 
     // Equal priority → alphabetical tiebreak: Acme, Middle, Zebra.
     await screen.findByText('Acme')
@@ -194,7 +207,7 @@ describe('ProvidersSettings', () => {
     listOAuthProviders.mockResolvedValue({ providers: [] })
 
     const { ProvidersSettings } = await import('./providers-settings')
-    render(<ProvidersSettings onClose={vi.fn()} onViewChange={vi.fn()} view="keys" />)
+    render(<ProvidersSettings onClose={vi.fn()} view="keys" />)
 
     const row = await screen.findByText('Local / custom endpoint')
     expect(screen.getByText(/OpenAI-compatible endpoint/)).toBeTruthy()

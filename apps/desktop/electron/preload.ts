@@ -143,6 +143,8 @@ contextBridge.exposeInMainWorld('hermesDesktop', {
   fetchLinkTitle: url => ipcRenderer.invoke('hermes:fetchLinkTitle', url),
   sanitizeWorkspaceCwd: cwd => ipcRenderer.invoke('hermes:workspace:sanitize', cwd),
   settings: {
+    getAppBehavior: () => ipcRenderer.invoke('hermes:app-behavior:get'),
+    setAppBehavior: patch => ipcRenderer.invoke('hermes:app-behavior:set', patch),
     getDefaultProjectDir: () => ipcRenderer.invoke('hermes:setting:defaultProjectDir:get'),
     setDefaultProjectDir: dir => ipcRenderer.invoke('hermes:setting:defaultProjectDir:set', dir),
     pickDefaultProjectDir: () => ipcRenderer.invoke('hermes:setting:defaultProjectDir:pick')

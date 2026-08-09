@@ -159,6 +159,16 @@ declare global {
       fetchLinkTitle: (url: string) => Promise<string>
       sanitizeWorkspaceCwd: (cwd?: null | string) => Promise<{ cwd: string; sanitized: boolean }>
       settings: {
+        getAppBehavior: () => Promise<{
+          closeToTray: boolean
+          launchOnStartup: boolean
+          launchOnStartupSupported: boolean
+        }>
+        setAppBehavior: (patch: { closeToTray?: boolean; launchOnStartup?: boolean }) => Promise<{
+          closeToTray: boolean
+          launchOnStartup: boolean
+          launchOnStartupSupported: boolean
+        }>
         getDefaultProjectDir: () => Promise<{ defaultLabel: string; dir: null | string; resolvedCwd: string }>
         pickDefaultProjectDir: () => Promise<{ canceled: boolean; dir: null | string }>
         setDefaultProjectDir: (dir: null | string) => Promise<{ dir: null | string }>

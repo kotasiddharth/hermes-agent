@@ -99,10 +99,9 @@ describe('ThreadTimeline popover', () => {
     const { container } = renderTimeline()
     const popover = container.querySelector('[data-slot="thread-timeline-popover"]')
 
-    // A single named history control replaces the old column of anonymous
-    // ticks. The shell renders (it owns the fade transition); its rows do not.
-    expect(screen.getByRole('button', { name: 'Browse conversation history' })).toBeTruthy()
-    expect(container.querySelector('[data-slot="thread-timeline-ticks"]')).toBeNull()
+    // The compact left rail is always visible once there is history, but the
+    // heavier prompt-preview rows still wait until the rail is opened.
+    expect(container.querySelector('[data-slot="thread-timeline-ticks"]')?.querySelectorAll('button')).toHaveLength(6)
     expect(popover).not.toBeNull()
     expect(popover?.querySelectorAll('button')).toHaveLength(0)
     expect(screen.queryByText('prompt 0')).toBeNull()
@@ -128,7 +127,7 @@ describe('ThreadTimeline popover', () => {
 
 describe('ThreadTimeline below the threshold', () => {
   it('renders nothing for a short thread', () => {
-    messages = transcript(2)
+    messages = transcript(1)
 
     const { container } = renderTimeline()
 

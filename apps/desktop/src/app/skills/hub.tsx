@@ -1,6 +1,6 @@
 import { useStore } from '@nanostores/react'
-import { useQueries, useQuery } from '@tanstack/react-query'
-import { useCallback, useMemo, useState } from 'react'
+import { useQueries, useQuery, useQueryClient } from '@tanstack/react-query'
+import { type FormEvent, useCallback, useMemo, useState } from 'react'
 
 import { useDebounced } from '@/app/hooks/use-debounced'
 import { DetailPane } from '@/app/master-detail'
@@ -17,11 +17,15 @@ import {
   DialogHeader,
   DialogTitle
 } from '@/components/ui/dialog'
+import { Input } from '@/components/ui/input'
 import { SegmentedControl } from '@/components/ui/segmented-control'
 import {
+  addSkillHubTap,
   getMcpCatalog,
   getSkillHubSources,
+  getSkillHubTaps,
   previewSkillHub,
+  removeSkillHubTap,
   scanSkillHub,
   searchSkillsHub,
   type SkillHubResult,
@@ -29,14 +33,14 @@ import {
 } from '@/hermes'
 import { useI18n } from '@/i18n'
 import { stripAnsi } from '@/lib/ansi'
-import { FileText, Loader2, Package } from '@/lib/icons'
+import { FileText, Loader2 } from '@/lib/icons'
 import { cn } from '@/lib/utils'
 import {
   $hubActions,
   $hubActiveLog,
   $hubInstalledOverride,
   closeHubLog,
-  HUB_SOURCES_KEY,
+  hubSourcesQueryKey,
   installHubSkill,
   uninstallHubSkill,
   UPDATE_ALL_KEY,
@@ -45,13 +49,28 @@ import {
 import { notify, notifyError } from '@/store/notifications'
 import { $activeGatewayProfile, normalizeProfileKey } from '@/store/profile'
 
-import { prettyName } from '../settings/helpers'
 import { IntegrationsCatalog, matchesIntegrationCatalogQuery } from '../settings/integrations-catalog'
 import { ListRow, Pill, SettingsGroup, SettingsSection } from '../settings/primitives'
 
 const TRUST_RANK: Record<string, number> = { builtin: 2, trusted: 1, community: 0 }
+const HUB_DESCRIPTION_LIMIT = 120
 
 type HubFilter = 'all' | 'integrations' | 'skills'
+
+/** Keep Browse Hub rows scannable; the full source text remains in Preview. */
+export function shortHubDescription(description: string): string {
+  const normalized = description.replace(/\s+/g, ' ').trim()
+
+  if (normalized.length <= HUB_DESCRIPTION_LIMIT) {
+    return normalized
+  }
+
+  const sentenceEnd = Math.max(normalized.lastIndexOf('. ', HUB_DESCRIPTION_LIMIT), normalized.lastIndexOf('; ', HUB_DESCRIPTION_LIMIT))
+
+  const end = sentenceEnd >= Math.floor(HUB_DESCRIPTION_LIMIT * 0.6) ? sentenceEnd + 1 : HUB_DESCRIPTION_LIMIT
+
+  return `${normalized.slice(0, end).trimEnd()}…`
+}
 
 function trustTone(level: string): 'muted' | 'primary' | 'warn' {
   if (level === 'builtin') {
@@ -133,7 +152,7 @@ function HubSkillRow({
           )}
         </div>
       }
-      description={skill.description}
+      description={shortHubDescription(skill.description)}
       title={
         <span className="flex flex-wrap items-center gap-1.5">
           <span>{skill.name}</span>
@@ -146,23 +165,6 @@ function HubSkillRow({
   )
 }
 
-function InstalledChip({ kind, name }: { kind: 'integration' | 'skill'; name: string }) {
-  const { t } = useI18n()
-  const h = t.skills.hub
-  const Icon = kind === 'skill' ? FileText : Package
-  const label = kind === 'integration' ? prettyName(name) : name
-
-  return (
-    <div className="flex min-w-0 items-center gap-2 rounded-[var(--radius-md)] border border-(--ui-stroke-tertiary) bg-(--ui-bg-tertiary)/55 px-2.5 py-2">
-      <div className="grid size-7 shrink-0 place-items-center rounded-[var(--radius-sm)] bg-background text-(--ui-text-secondary)">
-        <Icon className="size-3.5" />
-      </div>
-      <span className="max-w-40 truncate text-[0.75rem] font-medium text-foreground">{label}</span>
-      <span className="text-[0.625rem] text-(--ui-text-tertiary)">{kind === 'skill' ? h.skill : h.integration}</span>
-    </div>
-  )
-}
-
 interface SkillsHubProps {
   query: string
 }
@@ -171,17 +173,32 @@ export function SkillsHub({ query }: SkillsHubProps) {
   const { t } = useI18n()
   const h = t.skills.hub
   const activeProfile = useStore($activeGatewayProfile)
+  const profileKey = normalizeProfileKey(activeProfile)
+  const queryClient = useQueryClient()
   const [filter, setFilter] = useState<HubFilter>('all')
+  const [marketplaceOpen, setMarketplaceOpen] = useState(false)
+  const [marketplaceRepo, setMarketplaceRepo] = useState('')
+  const [marketplaceError, setMarketplaceError] = useState<null | string>(null)
+  const [savingMarketplace, setSavingMarketplace] = useState(false)
+  const [removingMarketplace, setRemovingMarketplace] = useState<null | string>(null)
   const term = useDebounced(query.trim(), 350)
 
   const sourcesQuery = useQuery({
-    queryKey: HUB_SOURCES_KEY,
+    queryKey: hubSourcesQueryKey(profileKey),
     queryFn: getSkillHubSources,
     staleTime: 5 * 60_000
   })
 
+  const tapsQuery = useQuery({
+    queryKey: ['skill-hub-taps', profileKey],
+    queryFn: getSkillHubTaps,
+    staleTime: 5 * 60_000
+  })
+
+  // The catalog renders itself below. This observer shares its cache and only
+  // supplies the combined Hub empty state when both result types miss.
   const integrationsQuery = useQuery({
-    queryKey: ['integrations-catalog', normalizeProfileKey(activeProfile)],
+    queryKey: ['integrations-catalog', profileKey],
     queryFn: getMcpCatalog,
     staleTime: 5 * 60_000
   })
@@ -193,7 +210,7 @@ export function SkillsHub({ query }: SkillsHubProps) {
 
   const sourceSearches = useQueries({
     queries: searchableSources.map(source => ({
-      queryKey: ['skill-hub-search', term, source.id],
+      queryKey: ['skill-hub-search', profileKey, term, source.id],
       queryFn: () => searchSkillsHub(term, source.id),
       enabled: term.length > 0 && filter !== 'integrations',
       staleTime: 60_000
@@ -245,6 +262,67 @@ export function SkillsHub({ query }: SkillsHubProps) {
     setScan(null)
   }, [])
 
+  const closeMarketplaceDialog = useCallback(() => {
+    setMarketplaceOpen(false)
+    setMarketplaceRepo('')
+    setMarketplaceError(null)
+  }, [])
+
+  const addMarketplace = useCallback(
+    async (event: FormEvent<HTMLFormElement>) => {
+      event.preventDefault()
+
+      if (!marketplaceRepo.trim()) {
+        setMarketplaceError(h.marketplaceInvalid)
+
+        return
+      }
+
+      setSavingMarketplace(true)
+      setMarketplaceError(null)
+
+      try {
+        const result = await addSkillHubTap(marketplaceRepo)
+        await Promise.all([
+          queryClient.invalidateQueries({ queryKey: ['skill-hub-taps', profileKey] }),
+          queryClient.invalidateQueries({ queryKey: hubSourcesQueryKey(profileKey) })
+        ])
+        notify({
+          kind: 'success',
+          title: result.added ? h.marketplaceAdded(result.repo) : h.marketplaceAlreadyAdded(result.repo),
+          message: h.marketplaceDescription
+        })
+        closeMarketplaceDialog()
+      } catch (error) {
+        setMarketplaceError(h.marketplaceFailed)
+        notifyError(error, h.marketplaceFailed)
+      } finally {
+        setSavingMarketplace(false)
+      }
+    },
+    [closeMarketplaceDialog, h, marketplaceRepo, profileKey, queryClient]
+  )
+
+  const removeMarketplace = useCallback(
+    async (repo: string) => {
+      setRemovingMarketplace(repo)
+
+      try {
+        await removeSkillHubTap(repo)
+        await Promise.all([
+          queryClient.invalidateQueries({ queryKey: ['skill-hub-taps', profileKey] }),
+          queryClient.invalidateQueries({ queryKey: hubSourcesQueryKey(profileKey) })
+        ])
+        notify({ kind: 'success', title: h.marketplaceRemoved(repo), message: h.marketplaceDescription })
+      } catch (error) {
+        notifyError(error, h.marketplaceRemoveFailed)
+      } finally {
+        setRemovingMarketplace(null)
+      }
+    },
+    [h, profileKey, queryClient]
+  )
+
   const searchStateById = new Map<string, { failed: boolean; fetching: boolean }>()
   searchableSources.forEach((source, index) => {
     const sourceQuery = sourceSearches[index]
@@ -281,6 +359,7 @@ export function SkillsHub({ query }: SkillsHubProps) {
 
   const isInstalled = (identifier: string) => overrides[identifier] ?? Boolean(installed[identifier])
   const sources = sourcesQuery.data?.sources ?? []
+  const marketplaces = tapsQuery.data?.taps ?? []
   const featured = sourcesQuery.data?.featured ?? []
   const integrationEntries = integrationsQuery.data?.entries ?? []
   const matchingIntegrations = integrationEntries.filter(entry => matchesIntegrationCatalogQuery(entry, term))
@@ -294,17 +373,6 @@ export function SkillsHub({ query }: SkillsHubProps) {
   const integrationItems = filter === 'skills' ? [] : matchingIntegrations
   const hasInstalledSkills = Object.keys(installed).length > 0
 
-  const installedItems = [
-    ...Object.entries(installed).map(([identifier, entry]) => ({
-      id: identifier,
-      kind: 'skill' as const,
-      name: entry.name || identifier.split('/').pop() || identifier
-    })),
-    ...integrationEntries
-      .filter(entry => entry.installed)
-      .map(entry => ({ id: entry.name, kind: 'integration' as const, name: entry.name }))
-  ].filter(item => filter === 'all' || (filter === 'skills' ? item.kind === 'skill' : item.kind === 'integration'))
-
   const showSkillSection = filter !== 'integrations' && (skillLoading || sourcesQuery.isError || skillItems.length > 0)
   const showIntegrations = filter !== 'skills'
   const skillsSettled = !skillLoading && !sourcesQuery.isError
@@ -313,11 +381,11 @@ export function SkillsHub({ query }: SkillsHubProps) {
   const noMatchingIntegrations = filter !== 'skills' && integrationItems.length === 0 && integrationsSettled
 
   const showEmpty =
-    (filter === 'skills'
+    filter === 'skills'
       ? noMatchingSkills
       : filter === 'integrations'
         ? noMatchingIntegrations
-        : noMatchingSkills && noMatchingIntegrations) && !(showLanding && installedItems.length > 0)
+        : noMatchingSkills && noMatchingIntegrations
 
   const filterOptions = [
     { id: 'all', label: h.filterAll },
@@ -361,17 +429,45 @@ export function SkillsHub({ query }: SkillsHubProps) {
                   )
                 })
               )}
+              <Button onClick={() => setMarketplaceOpen(true)} size="xs" variant="text">
+                <Codicon name="add" size="0.875rem" />
+                {h.addMarketplace}
+              </Button>
             </div>
           </div>
 
-          {showLanding && installedItems.length > 0 && (
-            <SettingsSection icon={Package} meta={h.installedCount(installedItems.length)} title={h.installedTitle}>
+          {marketplaces.length > 0 && filter !== 'integrations' && (
+            <SettingsSection
+              aside={
+                <Button onClick={() => setMarketplaceOpen(true)} size="xs" variant="text">
+                  {h.addMarketplace}
+                </Button>
+              }
+              icon={FileText}
+              title={h.marketplaces}
+            >
               <SettingsGroup>
-                <div className="flex flex-wrap gap-2 px-4 py-4 sm:px-5">
-                  {installedItems.map(item => (
-                    <InstalledChip key={item.kind + '-' + item.id} kind={item.kind} name={item.name} />
-                  ))}
-                </div>
+                {marketplaces.map(marketplace => (
+                  <ListRow
+                    action={
+                      <Button
+                        disabled={removingMarketplace === marketplace.repo}
+                        onClick={() => void removeMarketplace(marketplace.repo)}
+                        size="xs"
+                        variant="text"
+                      >
+                        {removingMarketplace === marketplace.repo ? h.removingMarketplace : h.removeMarketplace}
+                      </Button>
+                    }
+                    key={marketplace.repo}
+                    title={
+                      <span className="flex flex-wrap items-center gap-1.5">
+                        <span>{marketplace.repo}</span>
+                        <Pill>GitHub</Pill>
+                      </span>
+                    }
+                  />
+                ))}
               </SettingsGroup>
             </SettingsSection>
           )}
@@ -416,8 +512,8 @@ export function SkillsHub({ query }: SkillsHubProps) {
 
           {showIntegrations && (
             <IntegrationsCatalog
+              compactDescriptions
               description={showLanding ? h.integrationsDescription : null}
-              hideInstalled={showLanding}
               hideWhenEmpty
               meta={null}
               query={term}
@@ -533,6 +629,34 @@ export function SkillsHub({ query }: SkillsHubProps) {
               </DialogFooter>
             </>
           )}
+        </DialogContent>
+      </Dialog>
+
+      <Dialog onOpenChange={open => (open ? setMarketplaceOpen(true) : closeMarketplaceDialog())} open={marketplaceOpen}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle>{h.addMarketplace}</DialogTitle>
+            <DialogDescription>{h.marketplaceDescription}</DialogDescription>
+          </DialogHeader>
+          <form className="space-y-3" onSubmit={event => void addMarketplace(event)}>
+            <Input
+              aria-label={h.githubRepository}
+              autoComplete="off"
+              autoFocus
+              onChange={event => setMarketplaceRepo(event.target.value)}
+              placeholder={h.githubRepositoryPlaceholder}
+              value={marketplaceRepo}
+            />
+            {marketplaceError && <p className="text-xs text-destructive" role="alert">{marketplaceError}</p>}
+            <DialogFooter>
+              <Button onClick={closeMarketplaceDialog} size="sm" type="button" variant="text">
+                {h.close}
+              </Button>
+              <Button disabled={savingMarketplace} size="sm" type="submit">
+                {savingMarketplace ? h.addingMarketplace : h.addMarketplace}
+              </Button>
+            </DialogFooter>
+          </form>
         </DialogContent>
       </Dialog>
     </div>

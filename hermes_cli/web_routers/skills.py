@@ -14,6 +14,7 @@ working.
 
 import asyncio  # noqa: F401 — used by handlers
 import logging
+import re
 from typing import Optional  # noqa: F401
 
 from fastapi import APIRouter, HTTPException  # noqa: F401
@@ -22,6 +23,7 @@ from hermes_cli.web_deps import late, LateState
 from hermes_cli.web_models import (
     SkillContentUpdate,
     SkillCreate,
+    SkillHubTapRequest,
     SkillInstallRequest,
     SkillToggle,
     SkillUninstallRequest,
@@ -49,6 +51,36 @@ load_config = late("load_config")
 # Live proxies for web_server-owned module state (mutations/monkeypatches
 # on web_server remain authoritative; resolved at operation time).
 _SKILL_HUB_SOURCE_LABELS = LateState("_SKILL_HUB_SOURCE_LABELS")
+
+_GITHUB_REPO_RE = re.compile(r"^[A-Za-z0-9][A-Za-z0-9_.-]*/[A-Za-z0-9][A-Za-z0-9_.-]*$")
+
+
+def _normalize_github_tap_repo(value: str) -> str:
+    """Normalize an owner/repo or GitHub URL into the persisted tap format."""
+    repo = (value or "").strip()
+    for prefix in ("https://github.com/", "http://github.com/", "git@github.com:"):
+        if repo.lower().startswith(prefix):
+            repo = repo[len(prefix):]
+            break
+    else:
+        if "://" in repo or repo.startswith("git@"):
+            raise ValueError("Enter a GitHub repository URL or owner/repo")
+
+    repo = repo.split("?", 1)[0].split("#", 1)[0].strip("/")
+    if repo.endswith(".git"):
+        repo = repo[:-4]
+    if not _GITHUB_REPO_RE.fullmatch(repo):
+        raise ValueError("Enter a GitHub repository URL or owner/repo")
+    return repo
+
+
+def _tap_payload(tap: dict) -> Optional[dict]:
+    """Return a safe, stable desktop payload for one persisted tap."""
+    try:
+        repo = _normalize_github_tap_repo(str(tap.get("repo", "")))
+    except ValueError:
+        return None
+    return {"repo": repo, "path": str(tap.get("path") or "skills/")}
 
 
 @hub_router.post("/api/skills/hub/install")
@@ -105,6 +137,58 @@ async def update_skills_hub(
         _log.exception("Failed to spawn skills update")
         raise HTTPException(status_code=500, detail=f"Failed to update skills: {exc}")
     return {"ok": True, "pid": proc.pid, "name": "skills-update"}
+
+
+@hub_router.get("/api/skills/hub/taps")
+async def list_skills_hub_taps(profile: Optional[str] = None):
+    """List GitHub repositories the active profile added to Browse Hub."""
+    try:
+        from tools.skills_hub import TapsManager
+
+        with _config_profile_scope(profile):
+            taps = TapsManager().list_taps()
+        return {"taps": [payload for tap in taps if (payload := _tap_payload(tap))]}
+    except Exception as exc:
+        _log.exception("skills hub taps listing failed")
+        raise HTTPException(status_code=502, detail=f"Hub marketplaces failed: {exc}")
+
+
+@hub_router.post("/api/skills/hub/taps")
+async def add_skills_hub_tap(body: SkillHubTapRequest, profile: Optional[str] = None):
+    """Add a user-owned GitHub repository as a Browse Hub marketplace."""
+    try:
+        repo = _normalize_github_tap_repo(body.repo)
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc))
+
+    try:
+        from tools.skills_hub import TapsManager
+
+        with _config_profile_scope(profile):
+            added = TapsManager().add(repo)
+        return {"ok": True, "added": added, "repo": repo}
+    except Exception as exc:
+        _log.exception("skills hub tap add failed")
+        raise HTTPException(status_code=502, detail=f"Could not add marketplace: {exc}")
+
+
+@hub_router.delete("/api/skills/hub/taps")
+async def remove_skills_hub_tap(body: SkillHubTapRequest, profile: Optional[str] = None):
+    """Remove a user-owned GitHub marketplace without touching installed skills."""
+    try:
+        repo = _normalize_github_tap_repo(body.repo)
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc))
+
+    try:
+        from tools.skills_hub import TapsManager
+
+        with _config_profile_scope(profile):
+            removed = TapsManager().remove(repo)
+        return {"ok": True, "removed": removed, "repo": repo}
+    except Exception as exc:
+        _log.exception("skills hub tap removal failed")
+        raise HTTPException(status_code=502, detail=f"Could not remove marketplace: {exc}")
 
 
 @hub_router.get("/api/skills/hub/sources")

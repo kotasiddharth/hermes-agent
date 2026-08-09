@@ -2,11 +2,9 @@
 
 Pure display functions with no HermesCLI state dependency.
 """
-
 import json
 import logging
 import os
-import re
 import shutil
 import subprocess
 import threading
@@ -42,7 +40,6 @@ def cprint(text: str):
     """Print ANSI-colored text through prompt_toolkit's renderer."""
     from prompt_toolkit import print_formatted_text as _pt_print
     from prompt_toolkit.formatted_text import ANSI as _PT_ANSI
-
     try:
         _pt_print(_PT_ANSI(text))
     except Exception:
@@ -57,17 +54,13 @@ def cprint(text: str):
 # Skin-aware color helpers
 # =========================================================================
 
-
 def _skin_color(key: str, fallback: str) -> str:
     """Get a color from the active skin, or return fallback."""
     try:
         from hermes_cli.skin_engine import get_active_skin
-
         return get_active_skin().get_color(key, fallback)
     except Exception:
         return fallback
-
-
 # =========================================================================
 # ASCII Art & Branding
 # =========================================================================
@@ -98,10 +91,10 @@ HERMES_CADUCEUS = """[#CD7F32]⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⢀⣀⡀⠀⣀⣀�
 [#B8860B]⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠈⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀[/]"""
 
 
+
 # =========================================================================
 # Skills scanning
 # =========================================================================
-
 
 def get_available_skills() -> Dict[str, List[str]]:
     """Return skills grouped by category, filtered by platform and disabled state.
@@ -112,7 +105,6 @@ def get_available_skills() -> Dict[str, List[str]]:
     """
     try:
         from tools.skills_tool import _find_all_skills
-
         all_skills = _find_all_skills()  # already filtered
     except Exception:
         return {}
@@ -130,7 +122,6 @@ def get_available_skills() -> Dict[str, List[str]]:
 
 # Cache update check results for 6 hours to avoid repeated git fetches
 _UPDATE_CHECK_CACHE_SECONDS = 6 * 3600
-_UPDATE_CHECK_CACHE_SCHEMA = 2
 
 # Sentinel returned when we know an update exists but can't count commits
 # (e.g. nix-built hermes — no local git history to count against).
@@ -138,25 +129,6 @@ UPDATE_AVAILABLE_NO_COUNT = -1
 
 _UPSTREAM_REPO_URL = "https://github.com/NousResearch/hermes-agent.git"
 _OFFICIAL_REPO_CANONICAL = "github.com/nousresearch/hermes-agent"
-_RELEASE_TAG_RE = re.compile(r"^v(\d+(?:\.\d+){2,})(?:[-+][0-9A-Za-z.-]+)?$")
-
-
-def _release_tag_key(tag: str) -> tuple[int, ...] | None:
-    """Return a sortable key for a stable Hermes release tag."""
-    match = _RELEASE_TAG_RE.fullmatch(tag.strip())
-    if not match:
-        return None
-    return tuple(int(part) for part in match.group(1).split("."))
-
-
-def _latest_tag(tags: list[str]) -> str | None:
-    """Pick the newest stable release tag from a collection of tag names."""
-    candidates = [
-        (key, tag) for tag in tags if (key := _release_tag_key(tag)) is not None
-    ]
-    if not candidates:
-        return None
-    return max(candidates)[1]
 
 
 def _canonical_github_remote(url: str | None) -> str:
@@ -165,9 +137,9 @@ def _canonical_github_remote(url: str | None) -> str:
         return ""
     value = url.strip()
     if value.startswith("git@github.com:"):
-        value = "github.com/" + value[len("git@github.com:") :]
+        value = "github.com/" + value[len("git@github.com:"):]
     elif value.startswith("ssh://git@github.com/"):
-        value = "github.com/" + value[len("ssh://git@github.com/") :]
+        value = "github.com/" + value[len("ssh://git@github.com/"):]
     else:
         parsed = urlparse(value)
         if parsed.netloc and parsed.path:
@@ -186,10 +158,7 @@ def _is_ssh_remote(url: str | None) -> bool:
 
 
 def _is_official_ssh_remote(url: str | None) -> bool:
-    return (
-        _is_ssh_remote(url)
-        and _canonical_github_remote(url) == _OFFICIAL_REPO_CANONICAL
-    )
+    return _is_ssh_remote(url) and _canonical_github_remote(url) == _OFFICIAL_REPO_CANONICAL
 
 
 def _git_stdout(args: list[str], *, cwd: Path, timeout: int = 5) -> Optional[str]:
@@ -213,47 +182,6 @@ def _git_stdout(args: list[str], *, cwd: Path, timeout: int = 5) -> Optional[str
     return (result.stdout or "").strip()
 
 
-def release_update_target(repo_dir: Path) -> tuple[str, str] | None:
-    """Return ``(current_tag, latest_tag)`` for a checked-out release.
-
-    Public desktop installs intentionally use a detached, shallow release tag.
-    Comparing that tag with ``origin/main`` reports every unreleased development
-    commit as an update. Only treat the checkout as a release-channel install
-    when ``HEAD`` is explicitly tagged; branch and developer checkouts retain
-    their existing branch-based behavior.
-    """
-    current_tags = (
-        _git_stdout(["tag", "--points-at", "HEAD", "--list", "v*"], cwd=repo_dir) or ""
-    ).splitlines()
-    current_tag = _latest_tag(current_tags)
-    if not current_tag:
-        return None
-
-    try:
-        result = subprocess.run(
-            ["git", "ls-remote", "--tags", "--refs", "origin", "v*"],
-            capture_output=True,
-            text=True,
-            encoding="utf-8",
-            errors="replace",
-            timeout=10,
-            cwd=str(repo_dir),
-        )
-    except Exception:
-        return None
-    if result.returncode != 0:
-        return None
-
-    latest_tag = _latest_tag(
-        line.rsplit("/", 1)[-1]
-        for line in (result.stdout or "").splitlines()
-        if "refs/tags/" in line
-    )
-    if not latest_tag:
-        return None
-    return current_tag, latest_tag
-
-
 def _check_via_rev(local_rev: str) -> Optional[int]:
     """Compare an embedded git revision to upstream main via ls-remote.
 
@@ -263,10 +191,7 @@ def _check_via_rev(local_rev: str) -> Optional[int]:
     try:
         result = subprocess.run(
             ["git", "ls-remote", _UPSTREAM_REPO_URL, "refs/heads/main"],
-            capture_output=True,
-            text=True,
-            encoding="utf-8",
-            errors="replace",
+            capture_output=True, text=True, encoding="utf-8", errors="replace",
             timeout=10,
         )
     except Exception:
@@ -281,11 +206,6 @@ def _check_via_rev(local_rev: str) -> Optional[int]:
 
 def _check_via_local_git(repo_dir: Path) -> Optional[int]:
     """Count commits behind origin/main in a local checkout."""
-    release_target = release_update_target(repo_dir)
-    if release_target is not None:
-        current_tag, latest_tag = release_target
-        return 0 if current_tag == latest_tag else UPDATE_AVAILABLE_NO_COUNT
-
     origin_url = _git_stdout(["remote", "get-url", "origin"], cwd=repo_dir)
     if _is_official_ssh_remote(origin_url):
         head_rev = _git_stdout(["rev-parse", "HEAD"], cwd=repo_dir)
@@ -320,8 +240,7 @@ def _check_via_local_git(repo_dir: Path) -> Optional[int]:
         fetch_args.append("--quiet")
         subprocess.run(
             fetch_args,
-            capture_output=True,
-            timeout=10,
+            capture_output=True, timeout=10,
             cwd=str(repo_dir),
         )
     except Exception:
@@ -332,9 +251,10 @@ def _check_via_local_git(repo_dir: Path) -> Optional[int]:
         # be a tracking ref in a `clone --depth 1`, so prefer FETCH_HEAD (just
         # updated by the fetch above) and fall back to origin/main.
         head_rev = _git_stdout(["rev-parse", "HEAD"], cwd=repo_dir)
-        target_rev = _git_stdout(
-            ["rev-parse", "FETCH_HEAD"], cwd=repo_dir
-        ) or _git_stdout(["rev-parse", "origin/main"], cwd=repo_dir)
+        target_rev = (
+            _git_stdout(["rev-parse", "FETCH_HEAD"], cwd=repo_dir)
+            or _git_stdout(["rev-parse", "origin/main"], cwd=repo_dir)
+        )
         if not head_rev or not target_rev:
             return None
         return 0 if head_rev == target_rev else UPDATE_AVAILABLE_NO_COUNT
@@ -342,10 +262,7 @@ def _check_via_local_git(repo_dir: Path) -> Optional[int]:
     try:
         result = subprocess.run(
             ["git", "rev-list", "--count", "HEAD..origin/main"],
-            capture_output=True,
-            text=True,
-            encoding="utf-8",
-            errors="replace",
+            capture_output=True, text=True, encoding="utf-8", errors="replace",
             timeout=5,
             cwd=str(repo_dir),
         )
@@ -380,7 +297,6 @@ def check_for_updates() -> Optional[int]:
     # (web_server.py); mirror that here so the banner/TUI surfaces agree.
     try:
         from hermes_cli.config import detect_install_method, get_project_root
-
         if detect_install_method(get_project_root()) == "docker":
             return None
     except Exception:
@@ -394,7 +310,6 @@ def check_for_updates() -> Optional[int]:
             cached = json.loads(cache_file.read_text(encoding="utf-8"))
             if (
                 now - cached.get("ts", 0) < _UPDATE_CHECK_CACHE_SECONDS
-                and cached.get("schema") == _UPDATE_CHECK_CACHE_SCHEMA
                 and cached.get("rev") == embedded_rev
                 and cached.get("ver") == VERSION
             ):
@@ -421,13 +336,7 @@ def check_for_updates() -> Optional[int]:
 
     try:
         cache_file.write_text(
-            json.dumps({
-                "schema": _UPDATE_CHECK_CACHE_SCHEMA,
-                "ts": now,
-                "behind": behind,
-                "rev": embedded_rev,
-                "ver": VERSION,
-            }),
+            json.dumps({"ts": now, "behind": behind, "rev": embedded_rev, "ver": VERSION}),
             encoding="utf-8",
         )
     except Exception:
@@ -488,7 +397,6 @@ def get_git_banner_state(repo_dir: Optional[Path] = None) -> Optional[dict]:
         # No git checkout — try the baked build SHA (Docker image path).
         try:
             from hermes_cli.build_info import get_build_sha
-
             baked = get_build_sha(short=8)
             if baked:
                 return {"upstream": baked, "local": baked, "ahead": 0}
@@ -503,7 +411,6 @@ def get_git_banner_state(repo_dir: Optional[Path] = None) -> Optional[dict]:
         # Fall back to the baked build SHA if available.
         try:
             from hermes_cli.build_info import get_build_sha
-
             baked = get_build_sha(short=8)
             if baked:
                 return {"upstream": baked, "local": baked, "ahead": 0}
@@ -606,12 +513,10 @@ _update_check_done = threading.Event()
 
 def prefetch_update_check():
     """Kick off update check in a background daemon thread."""
-
     def _run():
         global _update_result
         _update_result = check_for_updates()
         _update_check_done.set()
-
     t = threading.Thread(target=_run, daemon=True)
     t.start()
 
@@ -625,7 +530,6 @@ def get_update_result(timeout: float = 0.5) -> Optional[int]:
 # =========================================================================
 # Welcome banner
 # =========================================================================
-
 
 def _format_context_length(tokens: int) -> str:
     """Format a token count for display (e.g. 128000 → '128K', 1048576 → '1M')."""
@@ -648,20 +552,20 @@ def _display_toolset_name(toolset_name: str) -> str:
     """Normalize internal/legacy toolset identifiers for banner display."""
     if not toolset_name:
         return "unknown"
-    return toolset_name[:-6] if toolset_name.endswith("_tools") else toolset_name
+    return (
+        toolset_name[:-6]
+        if toolset_name.endswith("_tools")
+        else toolset_name
+    )
 
 
-def build_welcome_banner(
-    console: "Console",
-    model: str,
-    cwd: str,
-    tools: List[dict] = None,
-    enabled_toolsets: List[str] = None,
-    session_id: str = None,
-    get_toolset_for_tool=None,
-    context_length: int = None,
-    provider: str = None,
-):
+def build_welcome_banner(console: "Console", model: str, cwd: str,
+                         tools: List[dict] = None,
+                         enabled_toolsets: List[str] = None,
+                         session_id: str = None,
+                         get_toolset_for_tool=None,
+                         context_length: int = None,
+                         provider: str = None):
     """Build and print a welcome banner with caduceus on left and info on right.
 
     Args:
@@ -680,7 +584,6 @@ def build_welcome_banner(
     from model_tools import check_tool_availability, TOOLSET_REQUIREMENTS
     from rich.panel import Panel
     from rich.table import Table
-
     if get_toolset_for_tool is None:
         from model_tools import get_toolset_for_tool
 
@@ -697,8 +600,7 @@ def build_welcome_banner(
     _enabled_ts = {str(t) for t in enabled_toolsets}
     if _enabled_ts:
         unavailable_toolsets = [
-            item
-            for item in unavailable_toolsets
+            item for item in unavailable_toolsets
             if str(item.get("id", item.get("name", ""))) in _enabled_ts
         ]
     disabled_tools = set()
@@ -728,13 +630,8 @@ def build_welcome_banner(
     # Use skin's custom caduceus art if provided
     try:
         from hermes_cli.skin_engine import get_active_skin
-
         _bskin = get_active_skin()
-        _hero = (
-            _bskin.banner_hero
-            if hasattr(_bskin, "banner_hero") and _bskin.banner_hero
-            else HERMES_CADUCEUS
-        )
+        _hero = _bskin.banner_hero if hasattr(_bskin, 'banner_hero') and _bskin.banner_hero else HERMES_CADUCEUS
     except Exception:
         _bskin = None
         _hero = HERMES_CADUCEUS
@@ -759,14 +656,8 @@ def build_welcome_banner(
         if len(preset_name) > 28:
             preset_name = preset_name[:25] + "..."
         agg_str = f" [dim {dim}]·[/] [dim {dim}]agg {agg_label}[/]" if agg_label else ""
-        ctx_str = (
-            f" [dim {dim}]·[/] [dim {dim}]{_format_context_length(context_length)} context[/]"
-            if context_length
-            else ""
-        )
-        left_lines.append(
-            f"[{accent}]MoA: {preset_name}[/]{agg_str}{ctx_str} [dim {dim}]·[/] [dim {dim}]Nous Research[/]"
-        )
+        ctx_str = f" [dim {dim}]·[/] [dim {dim}]{_format_context_length(context_length)} context[/]" if context_length else ""
+        left_lines.append(f"[{accent}]MoA: {preset_name}[/]{agg_str}{ctx_str} [dim {dim}]·[/] [dim {dim}]Nous Research[/]")
     else:
         if not (model or "").strip() or (model or "").strip().lower() == "unknown":
             # Unconfigured install: say so in red instead of a blank/"unknown"
@@ -782,19 +673,11 @@ def build_welcome_banner(
                 model_short = model_short[:-5]
             if len(model_short) > 28:
                 model_short = model_short[:25] + "..."
-            ctx_str = (
-                f" [dim {dim}]·[/] [dim {dim}]{_format_context_length(context_length)} context[/]"
-                if context_length
-                else ""
-            )
-            left_lines.append(
-                f"[{accent}]{model_short}[/]{ctx_str} [dim {dim}]·[/] [dim {dim}]Nous Research[/]"
-            )
+            ctx_str = f" [dim {dim}]·[/] [dim {dim}]{_format_context_length(context_length)} context[/]" if context_length else ""
+            left_lines.append(f"[{accent}]{model_short}[/]{ctx_str} [dim {dim}]·[/] [dim {dim}]Nous Research[/]")
 
     if os.getenv("HERMES_YOLO_MODE"):
-        left_lines.append(
-            f"[bold red]⚠ YOLO mode[/] [dim {dim}]— all approval prompts bypassed[/]"
-        )
+        left_lines.append(f"[bold red]⚠ YOLO mode[/] [dim {dim}]— all approval prompts bypassed[/]")
     left_lines.append(f"[dim {dim}]{cwd}[/]")
     if session_id:
         left_lines.append(f"[dim {session_color}]Session: {session_id}[/]")
@@ -862,7 +745,6 @@ def build_welcome_banner(
     # MCP Servers section (only if configured)
     try:
         from tools.mcp_tool import get_mcp_status
-
         mcp_status = get_mcp_status()
     except Exception:
         mcp_status = []
@@ -956,7 +838,6 @@ def build_welcome_banner(
     try:
         from hermes_cli.codex_runtime_switch import get_current_runtime
         from hermes_cli.config import load_config as _load_cfg
-
         if get_current_runtime(_load_cfg()) == "codex_app_server":
             right_lines.append(
                 f"[bold {accent}]Runtime:[/] [{text}]codex app-server[/] "
@@ -967,7 +848,6 @@ def build_welcome_banner(
     # Show active profile name when not 'default'
     try:
         from hermes_cli.profiles import get_active_profile_name
-
         _profile_name = get_active_profile_name()
         if _profile_name and _profile_name != "default":
             right_lines.append(f"[bold {accent}]Profile:[/] [{text}]{_profile_name}[/]")
@@ -980,11 +860,7 @@ def build_welcome_banner(
     try:
         behind = get_update_result(timeout=0.5)
         if behind is not None and behind != 0:
-            from hermes_cli.config import (
-                get_managed_update_command,
-                recommended_update_command,
-            )
-
+            from hermes_cli.config import get_managed_update_command, recommended_update_command
             if behind > 0:
                 commits_word = "commit" if behind == 1 else "commits"
                 right_lines.append(
@@ -1025,11 +901,7 @@ def build_welcome_banner(
     console.print()
     term_width = shutil.get_terminal_size().columns
     if term_width >= 95:
-        _logo = (
-            _bskin.banner_logo
-            if _bskin and hasattr(_bskin, "banner_logo") and _bskin.banner_logo
-            else HERMES_AGENT_LOGO
-        )
+        _logo = _bskin.banner_logo if _bskin and hasattr(_bskin, 'banner_logo') and _bskin.banner_logo else HERMES_AGENT_LOGO
         console.print(_logo)
         console.print()
     console.print(outer_panel)

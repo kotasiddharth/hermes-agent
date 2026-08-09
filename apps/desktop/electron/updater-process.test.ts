@@ -214,8 +214,21 @@ test('wrapHandoffForDetachedConsole routes through cmd start with own console', 
 
   assert.equal(wrapped.command, 'cmd.exe')
   assert.deepEqual(wrapped.args, [
-    '/d', '/s', '/c', 'start', '', '/min',
-    'powershell', '-NoProfile', '-ExecutionPolicy', 'Bypass', '-File', expected,
-    '-InstallRoot', root, '-Branch', 'main'
+    '/d',
+    '/s',
+    '/c',
+    'start',
+    '',
+    '/min',
+    'powershell',
+    '-NoProfile',
+    '-ExecutionPolicy',
+    'Bypass',
+    '-File',
+    expected,
+    '-InstallRoot',
+    root,
+    '-Branch',
+    'main'
   ])
 })

@@ -312,7 +312,7 @@ function FileTreeLoadingState() {
 }
 
 // Terse pane empty state ("No files" / "No diffs"): the panel label itself —
-// same uppercase/tracking + dither dot — just muted instead of theme-primary,
+// same uppercase/tracking treatment, just muted instead of theme-primary,
 // centered. Shared by the file tree and review panes so both read identically.
 export function PaneEmptyState({ label }: { label: string }) {
   return (

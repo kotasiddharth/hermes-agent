@@ -1093,10 +1093,10 @@ export function ChatBar({
           <div className={cn(composerFloatingStrip, 'px-[5px] pb-1.5 empty:hidden')}>
             <ActionBadges sessionId={statusSessionId} />
           </div>
-          {/* Session-scoped status stack (todos, subagents, background tasks,
-              queue). An in-flow dock child: the dock is bottom-anchored, so it
-              grows upward over the thread and the dock's own measurement covers
-              it. Collapses to nothing when every status is empty. */}
+          {/* Project context and the session-scoped status stack (todos,
+              subagents, background tasks, queue) are in-flow dock children.
+              The dock is bottom-anchored, so they grow upward over the thread
+              and its own measurement covers their full height. */}
           <ComposerStatusStack
             queue={
               activeQueueSessionKey && queuedPrompts.length > 0 ? (
@@ -1125,6 +1125,15 @@ export function ChatBar({
               ) : null
             }
             sessionId={statusSessionId}
+          />
+          <CodingStatusRow
+            onBranchOff={handleBranchOff}
+            onConvertBranch={handleConvertBranch}
+            onListBranches={handleListBranches}
+            onOpen={() => toggleReview(scope.target === 'main' ? null : (cwd ?? null))}
+            onOpenWorktree={openInWorktree}
+            onSwitchBranch={handleSwitchBranch}
+            repoPath={cwd}
           />
           <ComposerPrimitive.Root
             className={cn(
@@ -1203,18 +1212,6 @@ export function ChatBar({
                     composerFill,
                     composerSurfaceGlass
                   )}
-                />
-                <CodingStatusRow
-                  onBranchOff={handleBranchOff}
-                  onConvertBranch={handleConvertBranch}
-                  onListBranches={handleListBranches}
-                  // A tile's rail reviews ITS worktree: pin the pane's scope to
-                  // this surface's cwd. Main keeps the classic follow-the-
-                  // active-session scope (null).
-                  onOpen={() => toggleReview(scope.target === 'main' ? null : (cwd ?? null))}
-                  onOpenWorktree={openInWorktree}
-                  onSwitchBranch={handleSwitchBranch}
-                  repoPath={cwd}
                 />
                 <div
                   className={cn(

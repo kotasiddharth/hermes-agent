@@ -163,6 +163,12 @@ export const ar = defineLocale({
   titlebar: {
     hideSidebar: 'إخفاء الشريط الجانبي',
     showSidebar: 'إظهار الشريط الجانبي',
+    forward: 'إلى الأمام',
+    file: 'ملف',
+    edit: 'تحرير',
+    view: 'عرض',
+    help: 'مساعدة',
+    reload: 'إعادة تحميل النافذة',
     search: 'بحث',
     searchTitle: 'البحث في الجلسات والعروض والإجراءات',
     swapSidebarSides: 'تبديل جانبي الأشرطة',

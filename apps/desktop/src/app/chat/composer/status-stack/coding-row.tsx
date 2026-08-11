@@ -1,6 +1,7 @@
 import { useStore } from '@nanostores/react'
 import { memo, useEffect } from 'react'
 
+import { composerDockCard } from '@/components/chat/composer-dock'
 import { StatusRow } from '@/components/chat/status-row'
 import {
   type ActionItemSpec,
@@ -15,12 +16,22 @@ import { CopyButton } from '@/components/ui/copy-button'
 import { DiffCount } from '@/components/ui/diff-count'
 import type { HermesGitBranch } from '@/global'
 import { useI18n } from '@/i18n'
-import { displayPath } from '@/lib/display-path'
+import { isDesktopFsRemoteMode } from '@/lib/desktop-fs'
+import { cn } from '@/lib/utils'
 import { openWorktreeDialog, registerRepoStatusCwd, repoStatusForCwd, repoWorktreesForCwd } from '@/store/coding-status'
 import { notifyError } from '@/store/notifications'
 
 // Tiny uppercase section header, matching the composer "+" menu's labels.
 const MENU_SECTION = 'text-[0.625rem] font-semibold uppercase tracking-wider text-(--ui-text-tertiary)'
+
+const workspaceName = (path: string): string => {
+  const segments = path
+    .replace(/[\\/]+$/, '')
+    .split(/[\\/]/)
+    .filter(Boolean)
+
+  return segments[segments.length - 1] || path
+}
 
 interface CodingStatusRowProps {
   /** Branch the current draft off into a fresh worktree + session, based on
@@ -64,6 +75,7 @@ export const CodingStatusRow = memo(function CodingStatusRow({
   const p = t.sidebar.projects
   const fileMenu = t.fileMenu
   const resolvedRepoPath = repoPath?.trim() || undefined
+  const isRemoteWorkspace = isDesktopFsRemoteMode()
   // This surface's OWN worktree, always — never the primary's. The row used to
   // fall back to the global `$repoStatus` for a blank repoPath, which painted
   // the main pane's branch/± onto a tile whose cwd hadn't resolved yet. That
@@ -98,8 +110,51 @@ export const CodingStatusRow = memo(function CodingStatusRow({
     void openWorktreeDialog({ base, repoPath: resolvedRepoPath })
   }
 
-  if (!status) {
+  if (!resolvedRepoPath) {
     return null
+  }
+
+  const workspaceLabel = workspaceName(resolvedRepoPath)
+  const workspaceSourceLabel = isRemoteWorkspace ? 'Remote' : 'Local'
+
+  const workspaceMeta = (
+    <>
+      <div className="group/workspace flex min-w-0 items-center gap-1.5">
+        <Codicon className="shrink-0 text-muted-foreground/85" name="folder" size="0.8rem" />
+        <span className="min-w-0 truncate text-xs font-medium text-foreground/92" title={resolvedRepoPath}>
+          {workspaceLabel}
+        </span>
+        <CopyButton
+          appearance="icon"
+          buttonSize="icon-xs"
+          className="pointer-events-none size-4 shrink-0 text-muted-foreground/50 opacity-0 transition-opacity hover:text-foreground group-hover/workspace:pointer-events-auto group-hover/workspace:opacity-100 group-focus-within/workspace:pointer-events-auto group-focus-within/workspace:opacity-100"
+          iconClassName="size-3"
+          label={fileMenu.copyPath}
+          side="top"
+          stopPropagation
+          text={resolvedRepoPath}
+        />
+      </div>
+      <span aria-hidden className="h-3 w-px shrink-0 bg-border/65" />
+      <span className="flex shrink-0 items-center gap-1.5 text-xs text-muted-foreground/80">
+        <Codicon name={isRemoteWorkspace ? 'server' : 'device-desktop'} size="0.78rem" />
+        {workspaceSourceLabel}
+      </span>
+    </>
+  )
+
+  if (!status) {
+    return (
+      <div className={cn(composerDockCard('full'), 'mx-2 mb-1.5 overflow-hidden')} data-slot="coding-status-card">
+        <StatusRow
+          // A project is a folder even when it is not a Git checkout. Keep its
+          // workspace breadcrumb available rather than hiding all context.
+          className="coding-status-bar min-h-8 rounded-[inherit] px-3.5 py-1.5 hover:bg-transparent"
+        >
+          <div className="flex min-w-0 flex-1 items-center gap-2">{workspaceMeta}</div>
+        </StatusRow>
+      </div>
+    )
   }
 
   const branchLabel = status.detached ? s.detached : status.branch || s.noBranch
@@ -185,62 +240,29 @@ export const CodingStatusRow = memo(function CodingStatusRow({
   }
 
   return (
-    <>
+    <div className={cn(composerDockCard('full'), 'mx-2 mb-1.5 overflow-hidden')} data-slot="coding-status-card">
       <ActionsContextMenu contentClassName="w-60" disabled={!onBranchOff} items={renderBranchItems}>
         <StatusRow
-          // The base "where am I working" strip is part of the composer surface
-          // itself, so it inherits the composer's width and clipped top radius.
-          className="coding-status-bar min-h-7 rounded-t-[inherit] rounded-b-none border-b border-(--ui-stroke-tertiary) px-3.5 py-1.5 hover:bg-transparent"
-          // Static branch glyph — never the loading spinner. This row only renders
-          // once `status` exists, so a spinner here only ever fired on *refreshes*
-          // of an already-loaded repo (window focus, turn settle), reading as an
-          // annoying icon "blip" with no first-load value. Refreshes are silent.
-          // It's a button (not the whole row) so the glyph opens the review pane
-          // while the strip around it stays inert; size-3.5 fills the slot exactly.
-          leading={
-            <button className="flex size-3.5 items-center justify-center" onClick={onOpen} type="button">
-              <Codicon className="text-(--ui-green)" name="git-branch" size="0.8rem" />
-            </button>
-          }
+          // The workspace breadcrumb lives in its own quiet card above the
+          // composer, preserving the full input surface for drafting.
+          className="coding-status-bar min-h-8 rounded-[inherit] px-3.5 py-1.5 hover:bg-transparent"
         >
-          <div className="flex min-w-0 flex-1 items-center gap-1">
-            {/* Branch name — the other half of the review-pane target. `contents`
-                so the button lays out nothing of its own: the label stays the
-                same flex child it always was, and the hit area is the text. */}
-            <button className="contents" onClick={onOpen} type="button">
-              <span className="min-w-0 truncate text-xs font-normal text-muted-foreground/92" title={branchLabel}>
+          <div className="flex min-w-0 flex-1 items-center gap-2">
+            {workspaceMeta}
+            <span aria-hidden className="h-3 w-px shrink-0 bg-border/65" />
+
+            {/* Branch name is the review-pane target; the folder and connection
+                stay plain context so the breadcrumb reads as one stable path. */}
+            <button
+              className="flex min-w-0 items-center gap-1.5 text-muted-foreground/92 hover:text-foreground"
+              onClick={onOpen}
+              type="button"
+            >
+              <Codicon className="shrink-0 text-(--ui-green)" name="git-branch" size="0.78rem" />
+              <span className="min-w-0 truncate text-xs font-medium" title={branchLabel}>
                 {branchLabel}
               </span>
             </button>
-
-            {/* Worktree path + copy — plain muted text, not a chip. Always in the
-                flex so hover doesn't reflow the row; opacity alone reveals the
-                pair. The path sizes to its content (the `flex-1` lives on the
-                wrapper) so the glyph sits against the end of the text instead of
-                drifting to the far edge of the row. `displayPath` collapses
-                home → ~; the copy still takes the real absolute path, and it's
-                the shared `CopyButton` so it confirms with the same inline
-                checkmark as every other copy in the app. */}
-            {resolvedRepoPath && (
-              <div className="flex min-w-0 flex-1 items-center gap-0.5 opacity-0 transition-opacity group-hover/status-row:opacity-100 group-focus-within/status-row:opacity-100">
-                <span
-                  className="min-w-0 truncate font-mono text-[0.62rem] leading-4 text-muted-foreground/50"
-                  data-slot="coding-status-cwd"
-                >
-                  {displayPath(resolvedRepoPath)}
-                </span>
-                <CopyButton
-                  appearance="icon"
-                  buttonSize="icon-xs"
-                  className="pointer-events-none size-4 shrink-0 text-muted-foreground/50 hover:text-foreground group-hover/status-row:pointer-events-auto group-focus-within/status-row:pointer-events-auto"
-                  iconClassName="size-3"
-                  label={fileMenu.copyPath}
-                  side="top"
-                  stopPropagation
-                  text={resolvedRepoPath}
-                />
-              </div>
-            )}
 
             {/* Branch actions kebab — same pattern as the session/worktree rows.
                 ALWAYS laid out; only its opacity flips on hover/focus/open, so
@@ -257,7 +279,7 @@ export const CodingStatusRow = memo(function CodingStatusRow({
               >
                 <Button
                   aria-label={s.newBranch}
-                  className="pointer-events-none size-4 shrink-0 text-muted-foreground/60 opacity-0 transition hover:text-foreground group-hover/status-row:pointer-events-auto group-hover/status-row:opacity-100 group-focus-within/status-row:pointer-events-auto group-focus-within/status-row:opacity-100 data-[state=open]:pointer-events-auto data-[state=open]:opacity-100"
+                  className="pointer-events-none ml-auto size-4 shrink-0 text-muted-foreground/60 opacity-0 transition hover:text-foreground group-hover/status-row:pointer-events-auto group-hover/status-row:opacity-100 group-focus-within/status-row:pointer-events-auto group-focus-within/status-row:opacity-100 data-[state=open]:pointer-events-auto data-[state=open]:opacity-100"
                   size="icon-xs"
                   variant="ghost"
                 >
@@ -306,6 +328,6 @@ export const CodingStatusRow = memo(function CodingStatusRow({
           )}
         </StatusRow>
       </ActionsContextMenu>
-    </>
+    </div>
   )
 })

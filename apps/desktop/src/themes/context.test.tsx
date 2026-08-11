@@ -1,8 +1,8 @@
 import { act, cleanup, render } from '@testing-library/react'
-import { afterEach, beforeEach, describe, expect, it } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 import { __resetBackendSkinSync, ingestBackendSkin } from './backend-sync'
-import { ThemeProvider } from './context'
+import { modePref, skinPref, ThemeProvider } from './context'
 
 // The live-authoring loop: Hermes writes/edits one skin file and every surface
 // repaints. An in-place edit keeps the NAME — only the palette moves.
@@ -14,12 +14,39 @@ const bloomberg = (foreground: string) => ({
 const cssVar = (name: string) => window.document.documentElement.style.getPropertyValue(name)
 
 describe('ThemeProvider ← backend skin sync', () => {
+  let setTitleBarTheme: ReturnType<typeof vi.fn>
+
   beforeEach(() => {
     window.localStorage.clear()
     __resetBackendSkinSync()
+    setTitleBarTheme = vi.fn()
+    Object.defineProperty(window, 'hermesDesktop', {
+      configurable: true,
+      value: { setTitleBarTheme }
+    })
   })
 
-  afterEach(cleanup)
+  afterEach(() => {
+    cleanup()
+    Reflect.deleteProperty(window, 'hermesDesktop')
+  })
+
+  it('uses the renderer titlebar surface for the native overlay', () => {
+    skinPref.assign('default', 'graphite')
+    modePref.assign('default', 'dark')
+
+    render(
+      <ThemeProvider>
+        <div />
+      </ThemeProvider>
+    )
+
+    expect(setTitleBarTheme).toHaveBeenLastCalledWith({
+      background: '#151718',
+      foreground: '#e6e9e8',
+      titleBarBackground: '#242729'
+    })
+  })
 
   it('applies an activated backend skin', () => {
     render(

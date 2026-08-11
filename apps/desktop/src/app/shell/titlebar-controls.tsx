@@ -1,18 +1,30 @@
 import { useStore } from '@nanostores/react'
 import { type ComponentProps, type MouseEvent, type ReactNode, useEffect, useState } from 'react'
-import { useLocation, useNavigate } from 'react-router'
+import { useLocation, useNavigate, useNavigationType } from 'react-router'
 
 import { toggleLayoutEditMode } from '@/components/pane-shell/edit-mode'
 import { resetLayoutTree } from '@/components/pane-shell/tree/store'
 import { Button } from '@/components/ui/button'
 import { Codicon } from '@/components/ui/codicon'
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger
+} from '@/components/ui/dropdown-menu'
 import { Tip, TipKeybindLabel } from '@/components/ui/tooltip'
 import { useI18n } from '@/i18n'
+import { openExternalLink } from '@/lib/external-link'
 import { triggerHaptic } from '@/lib/haptics'
 import { cn } from '@/lib/utils'
 import { $fileBrowserOpen, $sidebarOpen, toggleFileBrowserOpen, toggleSidebarOpen } from '@/store/layout'
+import { requestFreshSession } from '@/store/profile'
+import { openFolderAsProject } from '@/store/projects'
+import { openUpdatesWindow } from '@/store/updates'
+import { openNewWindow } from '@/store/windows'
 
-import { appViewForPath, isOverlayView } from '../routes'
+import { appViewForPath, isOverlayView, SETTINGS_ROUTE } from '../routes'
 
 import { titlebarButtonClass } from './titlebar'
 
@@ -39,6 +51,8 @@ interface TitlebarControlsProps extends ComponentProps<'div'> {
   leftTools?: readonly TitlebarTool[]
   tools?: readonly TitlebarTool[]
   onOpenSettings: () => void
+  /** Windows/Linux need renderer menus; macOS already owns the native menu bar. */
+  showAppMenu?: boolean
 }
 
 /**
@@ -87,14 +101,20 @@ function useModifierHeld(): boolean {
   return held
 }
 
-export function TitlebarControls({ leftTools = [], tools = [], onOpenSettings }: TitlebarControlsProps) {
+export function TitlebarControls({
+  leftTools = [],
+  tools = [],
+  onOpenSettings,
+  showAppMenu = true
+}: TitlebarControlsProps) {
   const { t } = useI18n()
   const navigate = useNavigate()
   const location = useLocation()
+  const navigationType = useNavigationType()
   const modHeld = useModifierHeld()
   const fileBrowserOpen = useStore($fileBrowserOpen)
   const sidebarOpen = useStore($sidebarOpen)
-
+  const history = useTitlebarHistory(location.key, navigate, navigationType)
   const leftEdge = { open: sidebarOpen, toggle: toggleSidebarOpen }
   // This control shows or hides the physical right edge of the main zone, so
   // it stays correct through layout flips and rearranges.
@@ -110,6 +130,23 @@ export function TitlebarControls({ leftTools = [], tools = [], onOpenSettings }:
       leftEdge.toggle()
     }
   }
+
+  const historyTools: TitlebarTool[] = [
+    {
+      disabled: !history.canGoBack,
+      icon: <Codicon name="arrow-left" />,
+      id: 'back',
+      label: t.common.back,
+      onSelect: history.goBack
+    },
+    {
+      disabled: !history.canGoForward,
+      icon: <Codicon name="arrow-right" />,
+      id: 'forward',
+      label: t.titlebar.forward,
+      onSelect: history.goForward
+    }
+  ]
 
   const rightSidebarTool: TitlebarTool = {
     actionId: 'view.toggleRightSidebar',
@@ -166,20 +203,31 @@ export function TitlebarControls({ leftTools = [], tools = [], onOpenSettings }:
 
   const visibleSystemTools = systemTools.filter(tool => !tool.hidden)
   const visiblePaneTools = tools.filter(tool => !tool.hidden)
-  const visibleLeftTools = [sidebarTool, ...leftTools].filter(tool => !tool.hidden)
+  const visibleLeftTools = leftTools.filter(tool => !tool.hidden)
 
   return (
     <>
-      {visibleLeftTools.length > 0 && (
-        <div
-          aria-label={t.shell.windowControls}
-          className="fixed left-(--titlebar-controls-left) top-(--titlebar-controls-top) z-70 flex translate-y-0.5 flex-row items-center gap-x-1 pointer-events-auto select-none [-webkit-app-region:no-drag]"
-        >
-          {visibleLeftTools.map(tool => (
-            <TitlebarToolButton key={tool.id} navigate={navigate} tool={tool} />
-          ))}
-        </div>
-      )}
+      <div
+        aria-label={t.shell.windowControls}
+        className="fixed left-(--titlebar-controls-left) top-(--titlebar-controls-top) z-70 flex translate-y-0.5 flex-row items-center gap-x-1 pointer-events-auto select-none [-webkit-app-region:no-drag]"
+      >
+        <TitlebarToolButton navigate={navigate} tool={sidebarTool} />
+        {historyTools.map(tool => (
+          <TitlebarToolButton key={tool.id} navigate={navigate} tool={tool} />
+        ))}
+        {showAppMenu && (
+          <TitlebarAppMenu
+            onOpenSettings={onOpenSettings}
+            rightSidebarLabel={rightSidebarTool.label}
+            sidebarLabel={sidebarTool.label}
+            toggleRightSidebar={rightEdge.toggle}
+            toggleSidebar={leftEdge.toggle}
+          />
+        )}
+        {visibleLeftTools.map(tool => (
+          <TitlebarToolButton key={tool.id} navigate={navigate} tool={tool} />
+        ))}
+      </div>
 
       {/*
         Pane-scoped tools (preview's monitor / devtools / refresh / X) render
@@ -210,6 +258,209 @@ export function TitlebarControls({ leftTools = [], tools = [], onOpenSettings }:
         <TitlebarToolButton navigate={navigate} tool={rightSidebarTool} />
       </div>
     </>
+  )
+}
+
+function readHistoryIndex(): number {
+  const state = typeof window === 'undefined' ? null : window.history.state
+
+  return typeof state?.idx === 'number' && state.idx >= 0 ? state.idx : 0
+}
+
+/** HashRouter writes an `idx` into history state. Track the highest observed
+ * index so the forward affordance comes back after a back navigation, while a
+ * fresh route push correctly clears the now-discarded forward history. */
+function useTitlebarHistory(
+  locationKey: string,
+  navigate: ReturnType<typeof useNavigate>,
+  navigationType: ReturnType<typeof useNavigationType>
+) {
+  const [state, setState] = useState(() => {
+    const index = readHistoryIndex()
+
+    return { index, maxIndex: index }
+  })
+
+  useEffect(() => {
+    const index = readHistoryIndex()
+
+    setState(previous => ({
+      index,
+      maxIndex: navigationType === 'PUSH' ? index : Math.max(previous.maxIndex, index)
+    }))
+  }, [locationKey, navigationType])
+
+  return {
+    canGoBack: state.index > 0,
+    canGoForward: state.index < state.maxIndex,
+    goBack: () => {
+      triggerHaptic('tap')
+      navigate(-1)
+    },
+    goForward: () => {
+      triggerHaptic('tap')
+      navigate(1)
+    }
+  }
+}
+
+function TitlebarAppMenu({
+  onOpenSettings,
+  rightSidebarLabel,
+  sidebarLabel,
+  toggleRightSidebar,
+  toggleSidebar
+}: {
+  onOpenSettings: () => void
+  rightSidebarLabel: string
+  sidebarLabel: string
+  toggleRightSidebar: () => void
+  toggleSidebar: () => void
+}) {
+  const { t } = useI18n()
+  const navigate = useNavigate()
+
+  return (
+    <div className="flex items-center gap-px" data-titlebar-menu-bar="">
+      <TitlebarMenu label={t.titlebar.file}>
+        <DropdownMenuItem
+          onSelect={() => {
+            triggerHaptic('tap')
+            requestFreshSession()
+          }}
+        >
+          <Codicon name="add" />
+          {t.keybinds.actions['session.new']}
+        </DropdownMenuItem>
+        <DropdownMenuItem
+          onSelect={() => {
+            triggerHaptic('tap')
+            void openNewWindow()
+          }}
+        >
+          <Codicon name="empty-window" />
+          {t.keybinds.actions['session.newWindow']}
+        </DropdownMenuItem>
+        <DropdownMenuSeparator />
+        <DropdownMenuItem
+          onSelect={() => {
+            triggerHaptic('open')
+            void openFolderAsProject()
+          }}
+        >
+          <Codicon name="folder-opened" />
+          {t.keybinds.actions['workspace.openFolder']}
+        </DropdownMenuItem>
+      </TitlebarMenu>
+
+      <TitlebarMenu label={t.titlebar.edit}>
+        <DropdownMenuItem
+          onSelect={() => {
+            triggerHaptic('open')
+            navigate(`${SETTINGS_ROUTE}?tab=keybinds`)
+          }}
+        >
+          <Codicon name="keyboard" />
+          {t.titlebar.openKeybinds}
+        </DropdownMenuItem>
+        <DropdownMenuItem
+          onSelect={() => {
+            triggerHaptic('open')
+            onOpenSettings()
+          }}
+        >
+          <Codicon name="settings-gear" />
+          {t.titlebar.openSettings}
+        </DropdownMenuItem>
+      </TitlebarMenu>
+
+      <TitlebarMenu label={t.titlebar.view}>
+        <DropdownMenuItem
+          onSelect={() => {
+            triggerHaptic('tap')
+            toggleSidebar()
+          }}
+        >
+          <Codicon name="layout-sidebar-left" />
+          {sidebarLabel}
+        </DropdownMenuItem>
+        <DropdownMenuItem
+          onSelect={() => {
+            triggerHaptic('tap')
+            toggleRightSidebar()
+          }}
+        >
+          <Codicon name="layout-sidebar-right" />
+          {rightSidebarLabel}
+        </DropdownMenuItem>
+        <DropdownMenuSeparator />
+        <DropdownMenuItem
+          onSelect={() => {
+            window.location.reload()
+          }}
+        >
+          <Codicon name="refresh" />
+          {t.titlebar.reload}
+        </DropdownMenuItem>
+      </TitlebarMenu>
+
+      <TitlebarMenu label={t.titlebar.help}>
+        <DropdownMenuItem
+          onSelect={() => {
+            triggerHaptic('open')
+            openExternalLink('https://github.com/NousResearch/hermes-agent#readme')
+          }}
+        >
+          <Codicon name="book" />
+          {t.common.docs}
+        </DropdownMenuItem>
+        <DropdownMenuItem
+          onSelect={() => {
+            triggerHaptic('open')
+            openUpdatesWindow()
+          }}
+        >
+          <Codicon name="sync" />
+          {t.settings.about.checkNow}
+        </DropdownMenuItem>
+        <DropdownMenuSeparator />
+        <DropdownMenuItem
+          onSelect={() => {
+            triggerHaptic('open')
+            navigate(`${SETTINGS_ROUTE}?tab=about`)
+          }}
+        >
+          <Codicon name="info" />
+          {t.settings.nav.about}
+        </DropdownMenuItem>
+      </TitlebarMenu>
+    </div>
+  )
+}
+
+function TitlebarMenu({ children, label }: { children: ReactNode; label: string }) {
+  return (
+    <DropdownMenu modal={false}>
+      <DropdownMenuTrigger asChild>
+        <Button
+          aria-label={label}
+          className={cn(
+            titlebarButtonClass,
+            'h-(--titlebar-control-height) rounded-[var(--radius-sm)] px-2 text-[0.8125rem] leading-none data-[state=open]:bg-(--ui-control-hover-background) data-[state=open]:text-foreground'
+          )}
+          motion="none"
+          onPointerDown={event => event.stopPropagation()}
+          size="inline"
+          type="button"
+          variant="ghost"
+        >
+          {label}
+        </Button>
+      </DropdownMenuTrigger>
+      <DropdownMenuContent align="start" className="min-w-48 p-1" side="bottom" sideOffset={6}>
+        {children}
+      </DropdownMenuContent>
+    </DropdownMenu>
   )
 }
 

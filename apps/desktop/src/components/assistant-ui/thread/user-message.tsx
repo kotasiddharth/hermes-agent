@@ -38,7 +38,7 @@ export function HumanMessageContainer({
     // read; the side timeline now provides the lightweight history cue instead.
     <>
       <div
-        className="group/user-message flex w-full min-w-0 max-w-full flex-col items-stretch gap-0 self-end overflow-visible pb-(--conversation-turn-gap) pt-1"
+        className="group/user-message flex w-fit min-w-0 max-w-[min(84%,40rem)] flex-col items-stretch gap-0 self-end overflow-visible pb-(--conversation-turn-gap) pt-1"
         data-message-id={messageId}
         data-role="user"
         data-slot="aui_user-message-root"

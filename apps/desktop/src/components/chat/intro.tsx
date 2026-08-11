@@ -14,6 +14,8 @@ type IntroCopyRecord = IntroCopy & {
 }
 
 export type IntroProps = {
+  /** A tab or split starts with the same guidance, at a calmer scale. */
+  compact?: boolean
   personality?: string
   seed?: number
 }
@@ -156,20 +158,24 @@ function resolveCopy(personality?: string, seed?: number): IntroCopy {
   return pickCopy(copies, seed)
 }
 
-export function Intro({ personality, seed }: IntroProps) {
+export function Intro({ compact = false, personality, seed }: IntroProps) {
   const [mountSeed] = useState(() => Math.floor(Math.random() * 100000))
   const copy = resolveCopy(personality, mountSeed + (seed ?? 0))
 
   return (
     <div
-      className="pointer-events-none flex w-full min-w-0 flex-col items-center justify-center px-0.5 py-6 text-center text-muted-foreground sm:px-6 lg:px-8"
+      className={
+        compact
+          ? 'pointer-events-none flex w-full min-w-0 flex-col items-center justify-center px-4 py-4 text-center text-muted-foreground sm:px-6'
+          : 'pointer-events-none flex w-full min-w-0 flex-col items-center justify-center px-0.5 py-6 text-center text-muted-foreground sm:px-6 lg:px-8'
+      }
       data-slot="aui_intro"
     >
-      <div className="w-full min-w-0">
+      <div className={compact ? 'w-full min-w-0 max-w-2xl' : 'w-full min-w-0'}>
         <p
           aria-label={WORDMARK}
           className="fit-text mx-auto mb-1 w-[calc(100%-1rem)] font-['Collapse'] font-bold uppercase leading-[0.9] tracking-[0.08em] text-midground mix-blend-plus-lighter dark:text-foreground/90"
-          style={{ '--fit-min': '2.75rem' } as CSSProperties}
+          style={{ '--fit-min': compact ? '1.75rem' : '2.75rem' } as CSSProperties}
         >
           <span>
             <span>{WORDMARK}</span>
@@ -177,7 +183,15 @@ export function Intro({ personality, seed }: IntroProps) {
           <span aria-hidden="true">{WORDMARK}</span>
         </p>
 
-        <p className="m-0 text-center leading-normal tracking-tight">{copy.body}</p>
+        <p
+          className={
+            compact
+              ? 'm-0 text-center text-sm leading-normal tracking-tight'
+              : 'm-0 text-center leading-normal tracking-tight'
+          }
+        >
+          {copy.body}
+        </p>
       </div>
     </div>
   )

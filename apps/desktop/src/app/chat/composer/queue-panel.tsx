@@ -41,12 +41,12 @@ export function QueuePanel({
   }
 
   return (
-    <div className="space-y-0.5 px-1 py-1">
+    <div className="space-y-1 px-2 py-2">
       {/* A normal queue is self-explanatory from its message rows, so avoid a
           second "N queued" heading. Only an explicitly parked queue needs a
           status line, since it tells people why their messages are waiting. */}
       {parked && (
-        <div className="flex items-center gap-1.5 px-1.5 py-1 text-[0.7rem] text-muted-foreground/85">
+        <div className="mb-1 flex items-center gap-1.5 border-b border-(--ui-stroke-tertiary) px-1 py-1.5 text-[0.75rem] text-muted-foreground/90">
           <Codicon className="shrink-0 text-muted-foreground/70" name="debug-pause" size="0.8rem" />
           <span className="min-w-0 flex-1 truncate">{c.queuedPaused(entries.length)}</span>
           <Tip label={c.queueResumeTip}>
@@ -69,7 +69,7 @@ export function QueuePanel({
         return (
           <StatusRow
             className={cn(
-              'border border-transparent px-1.5',
+              'border border-transparent px-2 py-1.5',
               isEditing &&
                 'border-[color-mix(in_srgb,var(--dt-composer-ring)_45%,transparent)] bg-accent/20 shadow-[inset_0_0_0_1px_color-mix(in_srgb,var(--dt-composer-ring)_18%,transparent)]'
             )}
@@ -121,7 +121,7 @@ export function QueuePanel({
             trailingVisible
           >
             <div className="min-w-0 flex-1">
-              <p className="truncate text-[0.73rem] leading-4 text-foreground/92">{entryPreview(entry, c)}</p>
+              <p className="truncate text-[0.75rem] leading-5 text-foreground/92">{entryPreview(entry, c)}</p>
               {(attachmentsCount > 0 || isEditing) && (
                 <div className="mt-0.5 flex items-center gap-1.5 text-[0.64rem] text-muted-foreground/75">
                   {attachmentsCount > 0 && <span>{c.attachments(attachmentsCount)}</span>}

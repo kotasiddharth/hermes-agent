@@ -433,7 +433,7 @@
     --conversation-caption-font-size: 0.75rem;
     --conversation-line-height: 1.125rem;
     --conversation-caption-line-height: 1rem;
-    --conversation-turn-gap: 0.375rem;
+    --conversation-turn-gap: 0.625rem;
     /* Gap between top-level turn blocks (prose ↔ tools ↔ thinking) — enough air
        that scaffolding reads as separate from the reply, not crammed into it. */
     --turn-block-gap: 0.75rem;
@@ -1211,6 +1211,73 @@ button[class*='rounded-full'],
   animation: overlay-card-out 180ms ease-in both;
 }
 
+/* Collapsible rails leave the main tree below the sidebar breakpoint. Keep the
+   overlay mounted through both directions so its entry and exit match the
+   quiet slide of a docked sidebar rather than popping in or out. */
+@keyframes narrow-pane-in-left {
+  from {
+    opacity: 0;
+    transform: translateX(-0.75rem);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+
+@keyframes narrow-pane-out-left {
+  from {
+    opacity: 1;
+    transform: translateX(0);
+  }
+
+  to {
+    opacity: 0;
+    transform: translateX(-0.5rem);
+  }
+}
+
+@keyframes narrow-pane-in-right {
+  from {
+    opacity: 0;
+    transform: translateX(0.75rem);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+
+@keyframes narrow-pane-out-right {
+  from {
+    opacity: 1;
+    transform: translateX(0);
+  }
+
+  to {
+    opacity: 0;
+    transform: translateX(0.5rem);
+  }
+}
+
+[data-narrow-pane-overlay][data-side='left'][data-motion='open'] {
+  animation: narrow-pane-in-left 220ms cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+
+[data-narrow-pane-overlay][data-side='left'][data-motion='closing'] {
+  animation: narrow-pane-out-left 180ms ease-in both;
+}
+
+[data-narrow-pane-overlay][data-side='right'][data-motion='open'] {
+  animation: narrow-pane-in-right 220ms cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+
+[data-narrow-pane-overlay][data-side='right'][data-motion='closing'] {
+  animation: narrow-pane-out-right 180ms ease-in both;
+}
+
 /* User bubbles are <button>s (click → edit), so the rule above would kill
    drag-to-select and leave ⌘C with nothing to grab. Message text stays
    selectable; chrome controls outside the bubble keep user-select: none. */
@@ -1694,10 +1761,12 @@ code {
   --composer-fill: color-mix(in srgb, var(--dt-card) 90%, var(--dt-background));
 }
 
+[data-slot='composer-dock'],
 [data-slot='composer-root'] {
   --composer-fill: color-mix(in srgb, var(--dt-card) 72%, transparent);
 }
 
+[data-slot='composer-dock'][data-thread-scrolled-up],
 [data-slot='composer-root'][data-thread-scrolled-up] {
   --composer-fill: color-mix(in srgb, var(--dt-card) 48%, transparent);
 }

@@ -1,4 +1,5 @@
 import { useStore } from '@nanostores/react'
+import { useQuery } from '@tanstack/react-query'
 import { useEffect, useState } from 'react'
 
 import { useSessionView } from '@/app/chat/session-view'
@@ -14,8 +15,9 @@ import { compactNumber } from '@/lib/format'
 import { ChevronDown } from '@/lib/icons'
 import { formatModelStatusLabel } from '@/lib/model-status-label'
 import { cn } from '@/lib/utils'
+import { $activeGatewayProfile } from '@/store/profile'
 import { $currentModelSource, $defaultReasoningEffort, setModelPickerOpen } from '@/store/session'
-import type { UsageStats } from '@/types/hermes'
+import type { ContextBreakdown, UsageStats } from '@/types/hermes'
 
 import { onComposerModelMenuRequest } from './focus'
 import { useComposerScope } from './scope'
@@ -35,8 +37,10 @@ export interface ContextWindowUsage {
   used: number
 }
 
-/** Normalizes the context data reported by the gateway for the compact ring. */
-export function contextWindowUsage(usage: null | UsageStats | undefined): ContextWindowUsage | null {
+type ContextWindowUsageSource = Pick<UsageStats, 'context_max' | 'context_percent' | 'context_used'> | UsageStats
+
+/** Normalizes context usage reported directly or calculated by the gateway. */
+export function contextWindowUsage(usage: ContextWindowUsageSource | null | undefined): ContextWindowUsage | null {
   const max = usage?.context_max
 
   if (typeof max !== 'number' || !Number.isFinite(max) || max <= 0) {
@@ -62,8 +66,8 @@ export function contextWindowUsage(usage: null | UsageStats | undefined): Contex
   return { max, percent: normalizedPercent, used: normalizedUsed }
 }
 
-/** Returns the remaining model context only when the gateway reported a real window. */
-export function contextTokensRemaining(usage: null | UsageStats | undefined): null | number {
+/** Returns the remaining model context only when the gateway reports a real window. */
+export function contextTokensRemaining(usage: ContextWindowUsageSource | null | undefined): null | number {
   const context = contextWindowUsage(usage)
 
   if (!context) {
@@ -105,37 +109,25 @@ export function ModelPill({
   const defaultEffort = useStore($defaultReasoningEffort)
   const runtimeId = useStore(view.$runtimeId)
   const usage = useStore(view.$usage)
+  const activeGatewayProfile = useStore($activeGatewayProfile)
   const { requestGateway } = useGatewayRequest()
-  const [requestedUsage, setRequestedUsage] = useState<{ runtimeId: string; usage: UsageStats } | null>(null)
   const [open, setOpen] = useState(false)
   const scope = useComposerScope()
   const hasLiveMenu = Boolean(model.modelMenuContent)
   const reportedContext = contextWindowUsage(usage)
   const hasReportedContext = Boolean(reportedContext)
 
-  // `session.info` normally includes its context window after a turn. On a
-  // resumed chat that metadata can arrive a little later, though. Fetch its
-  // lightweight usage snapshot once in the meantime so the ring never
-  // depends on opening the status-bar's detailed context popover.
-  useEffect(() => {
-    if (compact || !runtimeId || hasReportedContext) {
-      return
-    }
-
-    let cancelled = false
-
-    void requestGateway<UsageStats>('session.usage', { session_id: runtimeId })
-      .then(nextUsage => {
-        if (!cancelled) {
-          setRequestedUsage({ runtimeId, usage: nextUsage })
-        }
-      })
-      .catch(() => undefined)
-
-    return () => {
-      cancelled = true
-    }
-  }, [compact, hasReportedContext, requestGateway, runtimeId, usage?.total])
+  // Gateway usage intentionally omits context fields until it has an exact
+  // prompt-token reading. The context breakdown endpoint can calculate the
+  // current prompt footprint in that gap, so use it as a shared fallback.
+  // React Query deduplicates this per profile/session across tiled panes and
+  // refreshes it after usage changes instead of making each model pill poll.
+  const contextBreakdown = useQuery({
+    enabled: !compact && Boolean(runtimeId) && !hasReportedContext,
+    queryFn: () => requestGateway<ContextBreakdown>('session.context_breakdown', { session_id: runtimeId! }),
+    queryKey: ['session-context-breakdown', activeGatewayProfile, runtimeId, usage?.total ?? 0],
+    retry: false
+  })
 
   // The `composer.modelPicker` hotkey, routed to exactly one surface (the pane
   // under the pointer, else the active composer — see requestModelMenuToggle).
@@ -206,26 +198,27 @@ export function ModelPill({
     : copy.switchModel
 
   const title = pinnedOverride ? `${baseTitle} — ${copy.modelPinned}` : baseTitle
-  const requestedContext = requestedUsage?.runtimeId === runtimeId ? contextWindowUsage(requestedUsage.usage) : null
-  const context = compact ? null : (reportedContext ?? requestedContext)
+  const calculatedContext = contextWindowUsage(contextBreakdown.data)
+  const context = compact ? null : (reportedContext ?? calculatedContext)
   const contextPercent = Math.round(context?.percent ?? 0)
+  const contextPercentRemaining = Math.max(0, 100 - contextPercent)
 
   const contextDetail = context
     ? {
-        percentFull: t.composer.contextWindowFull(contextPercent),
+        percentUsed: t.composer.contextWindowUsageSummary(contextPercent, contextPercentRemaining),
         tokensUsed: t.composer.contextWindowUsage(compactNumber(context.used), compactNumber(context.max))
       }
     : null
 
   const contextAriaLabel = contextDetail
-    ? `${t.composer.contextWindow}. ${contextDetail.percentFull}. ${contextDetail.tokensUsed}.`
+    ? `${t.composer.contextWindow}. ${contextDetail.percentUsed}. ${contextDetail.tokensUsed}.`
     : t.composer.contextWindowUnavailable
 
   const contextTooltip = contextDetail ? (
     <span className="flex flex-col items-center whitespace-nowrap text-center font-normal">
-      <span>{t.composer.contextWindow}</span>
-      <span>{contextDetail.percentFull}</span>
-      <span>{contextDetail.tokensUsed}</span>
+      <span className="text-(--ui-text-tertiary)">{t.composer.contextWindow}:</span>
+      <span className="text-foreground">{contextDetail.percentUsed}</span>
+      <span className="text-foreground">{contextDetail.tokensUsed}</span>
     </span>
   ) : (
     contextAriaLabel
@@ -235,7 +228,11 @@ export function ModelPill({
 
   const contextCounter =
     !compact && currentModel.trim() ? (
-      <Tip label={contextTooltip} side="top">
+      <Tip
+        className="[&>span]:rounded-lg [&>span]:border [&>span]:border-(--ui-stroke-secondary) [&>span]:bg-(--ui-bg-elevated) [&>span]:px-3 [&>span]:py-2 [&>span]:text-xs [&>span]:font-normal [&>span]:text-(--ui-text-secondary)"
+        label={contextTooltip}
+        side="top"
+      >
         <span
           aria-label={contextAriaLabel}
           className={cn(

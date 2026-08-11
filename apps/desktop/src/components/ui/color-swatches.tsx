@@ -25,7 +25,7 @@ export function ColorSwatches({
         {swatches.map(swatch => (
           <button
             aria-label={swatchLabel?.(swatch) ?? swatch}
-            className="size-5 rounded-full transition-transform hover:scale-110"
+            className="size-5 rounded-full transition-[filter] hover:brightness-110"
             key={swatch}
             onClick={() => onChange(swatch)}
             style={{

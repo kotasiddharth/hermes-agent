@@ -32,10 +32,10 @@ const buttonVariants = cva(
         // the actionable affordance in a row ("Change", "Set", "Open logs", …).
         textStrong: `font-semibold text-muted-foreground underline underline-offset-4 hover:text-foreground ${TEXT_ACTION_ICON}`
       },
-      // Most surface buttons get a subtle lift on hover. Controls that are
-      // positioned with their own transform (for example, a titlebar close
-      // button centered with `-translate-y-1/2`) can opt out without losing
-      // the shared color and focus treatments.
+      // Surface buttons keep a compact press response, but hover feedback
+      // never moves the control. That keeps hit targets and adjacent layout
+      // visually stable while color, border, and shadow states still respond.
+      // Controls positioned with their own transform can opt out altogether.
       motion: {
         lift: '',
         none: ''
@@ -69,7 +69,7 @@ const buttonVariants = cva(
       {
         variant: ['default', 'destructive', 'outline', 'secondary', 'ghost'],
         motion: 'lift',
-        class: 'hover:-translate-y-px active:translate-y-0 active:scale-[0.98] active:duration-[90ms]'
+        class: 'active:scale-[0.98] active:duration-[90ms]'
       }
     ],
     defaultVariants: {

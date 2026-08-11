@@ -14,8 +14,8 @@ import { usePaneVisible } from '@/components/pane-shell/pane-visibility'
 import { $sessionTileDragging, $sessionTileEdgeHover } from '@/components/pane-shell/tree/store'
 import { PromptOverlays } from '@/components/prompt-overlays'
 import { Button } from '@/components/ui/button'
+import { Codicon } from '@/components/ui/codicon'
 import { ErrorState } from '@/components/ui/error-state'
-import { TitleMenuTrigger } from '@/components/ui/title-menu-trigger'
 import { type HermesGateway } from '@/hermes'
 import { useI18n } from '@/i18n'
 import type { ChatMessage } from '@/lib/chat-messages'
@@ -153,7 +153,19 @@ function ChatHeader({
           sideOffset={8}
           title={title}
         >
-          <TitleMenuTrigger>{title}</TitleMenuTrigger>
+          <Button
+            aria-label={title}
+            className="pointer-events-auto h-7 min-w-0 max-w-full gap-2 rounded-[var(--radius-sm)] border border-transparent bg-transparent px-1.5 text-(--ui-text-primary) hover:bg-(--ui-control-hover-background) data-[state=open]:bg-(--ui-control-active-background) [-webkit-app-region:no-drag]"
+            data-slot="chat-header-title"
+            motion="none"
+            size="inline"
+            type="button"
+            variant="ghost"
+          >
+            <Codicon className="shrink-0 text-(--ui-text-secondary)" name="folder" size="0.875rem" />
+            <span className="min-w-0 flex-1 truncate text-[0.8125rem] font-semibold leading-none">{title}</span>
+            <Codicon className="shrink-0 text-(--ui-text-tertiary)" name="ellipsis" size="0.875rem" />
+          </Button>
         </SessionActionsMenu>
       </div>
     </header>
@@ -388,9 +400,10 @@ export const ChatView = memo(function ChatView({
   // waiting for the resume effect (which paints a frame later) to clear them.
   const routeSessionMismatch = isRoutedSessionView && routedSessionId !== selectedSessionId
 
-  // The compact new-session pop-out skips the wordmark/tagline intro — it's a
-  // scratch window, not the full-height empty state.
-  const showIntro =
+  // Secondary windows stay bare scratchpads. A ready Ctrl/⌘T tab gets the same
+  // orientation as the primary draft, at a calmer scale for tabbed and split
+  // layouts instead of an otherwise empty canvas.
+  const showPrimaryIntro =
     isPrimary &&
     !isSecondaryWindow() &&
     freshDraftReady &&
@@ -398,6 +411,14 @@ export const ChatView = memo(function ChatView({
     !selectedSessionId &&
     !activeSessionId &&
     messagesEmpty
+
+  const showTileIntro =
+    !isPrimary && !isSecondaryWindow() && Boolean(activeSessionId) && messagesEmpty && !busy && !awaitingResponse
+
+  const intro =
+    showPrimaryIntro || showTileIntro
+      ? { compact: showTileIntro, personality: introPersonality, seed: introSeed }
+      : undefined
 
   // Session is still loading if the route references a session we haven't
   // resumed yet. Once `activeSessionId` is set (runtime has resumed), the
@@ -540,7 +561,7 @@ export const ChatView = memo(function ChatView({
             clampToComposer={showChatBar}
             cwd={currentCwd}
             gateway={gateway}
-            intro={showIntro ? { personality: introPersonality, seed: introSeed } : undefined}
+            intro={intro}
             loading={threadLoading}
             onBranchInNewChat={onBranchInNewChat}
             onCancel={haltRun}

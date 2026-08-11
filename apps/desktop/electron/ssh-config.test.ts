@@ -1,8 +1,12 @@
 import assert from 'node:assert/strict'
+import path from 'node:path'
 
 import { test } from 'vitest'
 
 import { collectSshConfigHosts, parseSshConfigHosts, parseSshConfigIncludes, parseSshGOutput } from './ssh-config'
+
+const HOME_DIR = path.join(path.parse(process.cwd()).root, 'home', 'u')
+const SSH_DIR = path.join(HOME_DIR, '.ssh')
 
 test('parseSshConfigHosts keeps literal aliases and drops wildcard/negated patterns', () => {
   const cfg = [
@@ -27,15 +31,20 @@ test('parseSshConfigIncludes extracts include tokens', () => {
 })
 
 test('collectSshConfigHosts follows Include directives (read-only)', () => {
+  const config = path.join(SSH_DIR, 'config')
+  const work = path.join(SSH_DIR, 'work')
+  const nested = path.join(SSH_DIR, 'nested')
+  const absoluteInclude = path.join(HOME_DIR, 'abs_inc')
+
   const files = {
-    '/home/u/.ssh/config': 'Host main\nInclude work\nInclude ~/abs_inc',
-    '/home/u/.ssh/work': 'Host work-box\nInclude nested',
-    '/home/u/.ssh/nested': 'Host deep',
-    '/home/u/abs_inc': 'Host home-abs'
+    [config]: 'Host main\nInclude work\nInclude ~/abs_inc',
+    [work]: 'Host work-box\nInclude nested',
+    [nested]: 'Host deep',
+    [absoluteInclude]: 'Host home-abs'
   }
 
-  const hosts = collectSshConfigHosts('/home/u/.ssh/config', {
-    homeDir: '/home/u',
+  const hosts = collectSshConfigHosts(config, {
+    homeDir: HOME_DIR,
     readFile: p => files[p] ?? null
   })
 
@@ -43,17 +52,23 @@ test('collectSshConfigHosts follows Include directives (read-only)', () => {
 })
 
 test('collectSshConfigHosts tolerates a missing config file', () => {
-  assert.deepEqual(collectSshConfigHosts('/nope/config', { homeDir: '/home/u', readFile: () => null }), [])
+  assert.deepEqual(
+    collectSshConfigHosts(path.join(HOME_DIR, 'nope', 'config'), { homeDir: HOME_DIR, readFile: () => null }),
+    []
+  )
 })
 
 test('collectSshConfigHosts does not loop on a self-include cycle', () => {
+  const config = path.join(SSH_DIR, 'config')
+  const loop = path.join(SSH_DIR, 'loop')
+
   const files = {
-    '/home/u/.ssh/config': 'Host a\nInclude loop',
-    '/home/u/.ssh/loop': 'Host b\nInclude config' // points back at config
+    [config]: 'Host a\nInclude loop',
+    [loop]: 'Host b\nInclude config' // points back at config
   }
 
-  const hosts = collectSshConfigHosts('/home/u/.ssh/config', {
-    homeDir: '/home/u',
+  const hosts = collectSshConfigHosts(config, {
+    homeDir: HOME_DIR,
     readFile: p => files[p] ?? null
   })
 
@@ -61,17 +76,21 @@ test('collectSshConfigHosts does not loop on a self-include cycle', () => {
 })
 
 test('collectSshConfigHosts expands globbed includes via injected globSync', () => {
+  const config = path.join(SSH_DIR, 'config')
+  const configGlob = path.join(SSH_DIR, 'config.d', '*')
+  const workConfig = path.join(SSH_DIR, 'config.d', '10-work')
+  const homeConfig = path.join(SSH_DIR, 'config.d', '20-home')
+
   const files = {
-    '/home/u/.ssh/config': 'Host root\nInclude config.d/*',
-    '/home/u/.ssh/config.d/10-work': 'Host work',
-    '/home/u/.ssh/config.d/20-home': 'Host home'
+    [config]: 'Host root\nInclude config.d/*',
+    [workConfig]: 'Host work',
+    [homeConfig]: 'Host home'
   }
 
-  const hosts = collectSshConfigHosts('/home/u/.ssh/config', {
-    homeDir: '/home/u',
+  const hosts = collectSshConfigHosts(config, {
+    homeDir: HOME_DIR,
     readFile: p => files[p] ?? null,
-    globSync: pattern =>
-      pattern.endsWith('config.d/*') ? ['/home/u/.ssh/config.d/10-work', '/home/u/.ssh/config.d/20-home'] : [pattern]
+    globSync: pattern => (pattern === configGlob ? [workConfig, homeConfig] : [pattern])
   })
 
   assert.deepEqual(hosts.sort(), ['home', 'root', 'work'].sort())

@@ -14,6 +14,7 @@ import { cn } from '@/lib/utils'
 import {
   $approvalModes,
   type ApprovalMode,
+  approvalModeLabels,
   type ApprovalModeRequester,
   setApprovalModeForProfile,
   syncApprovalModeForProfile
@@ -72,10 +73,7 @@ export function useApprovalModeMenu(
   const modes = useStore($approvalModes)
   const mode = modes[profile.trim() || 'default'] ?? 'smart'
 
-  const labels = useMemo<Record<ApprovalMode, string>>(
-    () => ({ manual: copy.manual, smart: copy.smart, off: copy.off }),
-    [copy.manual, copy.off, copy.smart]
-  )
+  const labels = useMemo<Record<ApprovalMode, string>>(() => approvalModeLabels(copy), [copy])
 
   const descriptions = useMemo<Record<ApprovalMode, string>>(
     () => ({

@@ -10,6 +10,7 @@ import { Switch } from '@/components/ui/switch'
 import { getElevenLabsVoices, getHermesConfigSchema, saveHermesConfig } from '@/hermes'
 import { useI18n } from '@/i18n'
 import { triggerHaptic } from '@/lib/haptics'
+import { approvalModeLabels } from '@/store/approval-mode'
 import {
   $dataUrlReadMaxMb,
   clampDataUrlReadMaxMb,
@@ -346,9 +347,11 @@ export function ConfigSettings({
                 optionLabels={
                   key === 'display.personality'
                     ? ASSISTANT_RESPONSE_STYLE_LABELS
-                    : key === 'tts.elevenlabs.voice_id'
-                      ? elevenLabsVoiceLabels
-                      : undefined
+                    : key === 'approvals.mode'
+                      ? approvalModeLabels(t.shell.approvalMode)
+                      : key === 'tts.elevenlabs.voice_id'
+                        ? elevenLabsVoiceLabels
+                        : undefined
                 }
                 schema={field}
                 schemaKey={key}

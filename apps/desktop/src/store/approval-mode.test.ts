@@ -3,6 +3,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 import {
   $approvalModes,
   approvalModeForProfile,
+  approvalModeLabels,
   reconcileApprovalModeForProfile,
   setApprovalModeForProfile,
   syncApprovalModeForProfile
@@ -22,6 +23,14 @@ function deferred<T>() {
 
 describe('profile-scoped approval mode cache', () => {
   beforeEach(() => $approvalModes.set({}))
+
+  it('uses the same labels for persisted enum values in every surface', () => {
+    expect(approvalModeLabels({ manual: 'Manual', off: 'Full access', smart: 'Smart' })).toEqual({
+      manual: 'Manual',
+      off: 'Full access',
+      smart: 'Smart'
+    })
+  })
 
   it('labels an unread profile Smart by default and adopts backend truth', async () => {
     expect(approvalModeForProfile('default')).toBe('smart')

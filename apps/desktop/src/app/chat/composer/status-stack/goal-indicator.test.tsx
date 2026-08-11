@@ -54,10 +54,11 @@ describe('ComposerStatusStack goal indicator', () => {
   it('shows an active goal with its title', () => {
     $goalsBySession.set({ [SID]: goal('active') })
 
-    renderStack()
+    const view = renderStack()
 
     expect(screen.getByText('Goal active')).toBeTruthy()
     expect(screen.getByText('ship the feature')).toBeTruthy()
+    expect(view.container.querySelector('[data-slot="composer-status-card"]')?.classList.contains('mb-1.5')).toBe(true)
   })
 
   it('labels a paused goal as paused', () => {

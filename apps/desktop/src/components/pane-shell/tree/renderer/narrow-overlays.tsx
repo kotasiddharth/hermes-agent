@@ -7,7 +7,7 @@
  */
 
 import { useStore } from '@nanostores/react'
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 
 import { ContribBoundary } from '@/contrib/react/boundary'
 import { useContributions } from '@/contrib/react/use-contributions'
@@ -21,12 +21,47 @@ import { $hiddenTreePanes, $layoutTree, $narrowViewport } from '../store'
 
 import { paneChrome } from './track-model'
 
+const NARROW_OVERLAY_EXIT_MS = 180
+
+type RevealedPane = {
+  id: string
+  motion: 'closing' | 'open'
+  pinned: boolean
+}
+
+const prefersReducedMotion = (): boolean =>
+  typeof window !== 'undefined' && Boolean(window.matchMedia?.('(prefers-reduced-motion: reduce)').matches)
+
 export function NarrowOverlays() {
   const narrow = useStore($narrowViewport)
   const tree = useStore($layoutTree)
   const panes = useContributions('panes')
   const hiddenPanes = useStore($hiddenTreePanes)
-  const [reveal, setReveal] = useState<{ id: string; pinned: boolean } | null>(null)
+  const [reveal, setReveal] = useState<RevealedPane | null>(null)
+
+  // Keep a closing rail mounted for its exit motion. Previously the narrow
+  // overlay was removed immediately, so opening and closing both hard-cut.
+  const closeReveal = useCallback((id?: string) => {
+    setReveal(current => {
+      if (!current || current.motion === 'closing' || (id && current.id !== id)) {
+        return current
+      }
+
+      return prefersReducedMotion() ? null : { ...current, motion: 'closing' }
+    })
+  }, [])
+
+  useEffect(() => {
+    if (reveal?.motion !== 'closing') {
+      return
+    }
+
+    const timer = window.setTimeout(() => {
+      setReveal(current => (current?.motion === 'closing' ? null : current))
+    }, NARROW_OVERLAY_EXIT_MS)
+
+    return () => window.clearTimeout(timer)
+  }, [reveal?.motion])
 
   // Own an Escape layer only while something is revealed, so Escape closes the
   // overlay only when it's the top layer (never under a dialog / edit mode).
@@ -69,16 +104,23 @@ export function NarrowOverlays() {
       // `open`/`close` are explicit intents (programmatic reveal, titlebar show);
       // `toggle` (default) is the ⌘B/⌘G flip.
       const mode = detail?.mode ?? 'toggle'
+
+      if (mode === 'close') {
+        closeReveal(match.id)
+
+        return
+      }
+
       setReveal(current => {
         if (mode === 'open') {
-          return { id: match.id, pinned: true }
+          return { id: match.id, motion: 'open', pinned: true }
         }
 
-        if (mode === 'close') {
-          return current?.id === match.id ? null : current
+        if (current?.id === match.id && current.pinned && current.motion === 'open') {
+          return prefersReducedMotion() ? null : { ...current, motion: 'closing' }
         }
 
-        return current?.id === match.id && current.pinned ? null : { id: match.id, pinned: true }
+        return { id: match.id, motion: 'open', pinned: true }
       })
     }
 
@@ -88,7 +130,7 @@ export function NarrowOverlays() {
       }
 
       event.preventDefault()
-      setReveal(null)
+      closeReveal()
     }
 
     window.addEventListener(PANE_TOGGLE_REVEAL_EVENT, onToggle)
@@ -98,7 +140,7 @@ export function NarrowOverlays() {
       window.removeEventListener(PANE_TOGGLE_REVEAL_EVENT, onToggle)
       window.removeEventListener('keydown', onKeyDown)
     }
-  }, [narrow])
+  }, [closeReveal, narrow])
 
   if (!narrow || collapsibles.length === 0) {
     return null
@@ -119,21 +161,29 @@ export function NarrowOverlays() {
             const first = collapsibles.find(p => sideOf(p) === side)
 
             if (first) {
-              setReveal(current => (current?.pinned ? current : { id: first.id, pinned: false }))
+              setReveal(current => (current?.pinned ? current : { id: first.id, motion: 'open', pinned: false }))
             }
           }}
         />
       ))}
 
-      {revealed && (
+      {revealed && reveal && (
         <div
           className={cn(
-            'absolute inset-y-0 z-40 flex flex-col overflow-hidden bg-(--ui-sidebar-surface-background) shadow-2xl',
+            'absolute inset-y-0 z-40 flex flex-col overflow-hidden bg-(--ui-sidebar-surface-background) shadow-2xl will-change-[transform,opacity]',
             sideOf(revealed) === 'left'
               ? 'left-0 border-r border-(--ui-stroke-secondary)'
-              : 'right-0 border-l border-(--ui-stroke-secondary)'
+              : 'right-0 border-l border-(--ui-stroke-secondary)',
+            reveal.motion === 'closing' && 'pointer-events-none'
           )}
-          onMouseLeave={() => setReveal(current => (current?.pinned ? current : null))}
+          data-motion={reveal.motion}
+          data-narrow-pane-overlay=""
+          data-side={sideOf(revealed)}
+          onMouseLeave={() => {
+            if (!reveal.pinned) {
+              closeReveal(revealed.id)
+            }
+          }}
           // Match the pane's docked width (sessions ~237px, files its rail
           // width) instead of a fat fixed 20rem — capped for tiny screens.
           style={{ width: `min(${(revealed.data as { width?: string } | undefined)?.width ?? '18rem'}, 85vw)` }}

@@ -1,6 +1,8 @@
-import { cleanup, render, screen } from '@testing-library/react'
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
+import { cleanup, screen, render as testingRender, waitFor } from '@testing-library/react'
 import { atom } from 'nanostores'
-import { afterEach, describe, expect, it } from 'vitest'
+import type { ReactElement } from 'react'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 import type { ChatBarState } from '@/app/chat/composer/types'
 import { type SessionView, SessionViewProvider } from '@/app/chat/session-view'
@@ -14,6 +16,18 @@ import {
 
 import { contextTokensRemaining, contextWindowUsage, ModelPill } from './model-pill'
 
+const requestGatewayMock = vi.hoisted(() => vi.fn())
+
+vi.mock('@/app/gateway/hooks/use-gateway-request', () => ({
+  useGatewayRequest: () => ({ requestGateway: requestGatewayMock })
+}))
+
+function render(ui: ReactElement) {
+  const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } })
+
+  return testingRender(<QueryClientProvider client={queryClient}>{ui}</QueryClientProvider>)
+}
+
 const modelState = (over: Partial<ChatBarState['model']> = {}): ChatBarState['model'] => ({
   canSwitch: true,
   model: 'gpt-6',
@@ -21,8 +35,20 @@ const modelState = (over: Partial<ChatBarState['model']> = {}): ChatBarState['mo
   ...over
 })
 
+beforeEach(() => {
+  requestGatewayMock.mockResolvedValue({
+    categories: [],
+    context_max: 0,
+    context_percent: 0,
+    context_used: 0,
+    estimated_total: 0,
+    model: ''
+  })
+})
+
 afterEach(() => {
   cleanup()
+  vi.clearAllMocks()
   $activeSessionId.set(null)
   setCurrentModel('')
   setCurrentModelSource('')
@@ -121,7 +147,7 @@ describe('ModelPill per-surface model label', () => {
     expect(screen.getByText('Sonnet · High')).toBeTruthy()
     expect(screen.queryByText(/primary/i)).toBeNull()
     expect(screen.getByTestId('context-window').getAttribute('aria-label')).toBe(
-      'Context window. 25% full. 50k / 200k tokens used.'
+      'Context window. 25% used (75% left). 50k / 200k tokens used.'
     )
   })
 })
@@ -134,7 +160,7 @@ describe('ModelPill context window', () => {
 
     const counter = screen.getByTestId('context-window')
 
-    expect(counter.getAttribute('aria-label')).toBe('Context window. 25% full. 50k / 200k tokens used.')
+    expect(counter.getAttribute('aria-label')).toBe('Context window. 25% used (75% left). 50k / 200k tokens used.')
     expect(counter.nextElementSibling?.getAttribute('aria-label')).toBe('Open model picker')
   })
 
@@ -147,7 +173,28 @@ describe('ModelPill context window', () => {
     ).toMatchObject({ max: 128_000, percent: 25, used: 32_000 })
   })
 
-  it('keeps an empty ring visible until the selected session reports its context window', () => {
+  it('calculates context usage when the session usage snapshot does not include it', async () => {
+    $activeSessionId.set('runtime-1')
+    requestGatewayMock.mockResolvedValueOnce({
+      categories: [],
+      context_max: 258_000,
+      context_percent: 42,
+      context_used: 107_000,
+      estimated_total: 107_000,
+      model: 'gpt-6'
+    })
+
+    render(<ModelPill disabled={false} model={modelState()} />)
+
+    await waitFor(() => {
+      expect(screen.getByTestId('context-window').getAttribute('aria-label')).toBe(
+        'Context window. 42% used (58% left). 107k / 258k tokens used.'
+      )
+    })
+    expect(requestGatewayMock).toHaveBeenCalledWith('session.context_breakdown', { session_id: 'runtime-1' })
+  })
+
+  it('keeps an empty ring visible for a draft without a session', () => {
     render(<ModelPill disabled={false} model={modelState()} />)
 
     expect(screen.getByTestId('context-window').getAttribute('aria-label')).toBe(

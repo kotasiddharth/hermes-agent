@@ -74,7 +74,7 @@ test('ensureGitRepo: inits a plain dir with a root commit so worktrees branch', 
     await ensureGitRepo('git', dir)
     assert.equal(git('rev-list', '--count', 'HEAD'), '1')
   } finally {
-    fs.rmSync(dir, { recursive: true, force: true })
+    fs.rmSync(dir, { recursive: true, force: true, maxRetries: 5, retryDelay: 100 })
   }
 })
 
@@ -159,13 +159,10 @@ test('listBranches: a branch claimed by a worktree is flagged checked out', asyn
 })
 
 test('listBranches: empty on a non-repo path', async () => {
-  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'hermes-nonrepo-'))
+  const dir = path.join(os.tmpdir(), `hermes-nonrepo-${process.pid}-${Date.now()}`)
 
-  try {
-    assert.deepEqual(await listBranches(dir, 'git'), [])
-  } finally {
-    fs.rmSync(dir, { recursive: true, force: true })
-  }
+  assert.equal(fs.existsSync(dir), false)
+  assert.deepEqual(await listBranches(dir, 'git'), [])
 })
 
 test('addWorktree: existingBranch checks the branch out without a new branch', async () => {

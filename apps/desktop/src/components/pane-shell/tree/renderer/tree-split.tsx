@@ -570,7 +570,7 @@ export function TreeSplit({ node, root, rootRow }: { node: SplitNode; root?: boo
           <div
             aria-hidden={collapsed || undefined}
             className={cn(
-              'relative flex min-h-0 min-w-0 overflow-hidden transition-[flex-basis,flex-grow,opacity] duration-250 ease-[cubic-bezier(0.16,1,0.3,1)]',
+              'relative flex min-h-0 min-w-0 overflow-hidden transition-[flex-basis,flex-grow,opacity,transform] duration-250 ease-[cubic-bezier(0.16,1,0.3,1)] will-change-[flex-basis,opacity,transform]',
               collapsed && 'pointer-events-none'
             )}
             data-collapsed={collapsed || undefined}
@@ -579,7 +579,17 @@ export function TreeSplit({ node, root, rootRow }: { node: SplitNode; root?: boo
             key={child.id}
             style={
               collapsed
-                ? { flex: '0 0 0px', minHeight: 0, minWidth: 0, opacity: 0 }
+                ? {
+                    flex: '0 0 0px',
+                    minHeight: 0,
+                    minWidth: 0,
+                    opacity: 0,
+                    transform: horizontal
+                      ? rootChildSide(child, paneFor) === 'right'
+                        ? 'translateX(0.625rem)'
+                        : 'translateX(-0.625rem)'
+                      : 'translateY(0.375rem)'
+                  }
                 : minimized
                   ? { flex: '0 0 auto' }
                   : {

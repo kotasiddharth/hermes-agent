@@ -499,7 +499,10 @@ export interface HermesConnection {
 }
 
 export interface HermesTitleBarTheme {
+  /** Window background used while a new renderer is still loading. */
   background: string
+  /** Opaque native titlebar surface. Keeps the OS accent frame from leaking through. */
+  titleBarBackground: string
   foreground: string
 }
 

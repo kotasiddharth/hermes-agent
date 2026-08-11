@@ -1,4 +1,3 @@
-#!/usr/bin/env node
 // stage-native-deps.mjs — stages node-pty's native runtime dependencies
 //
 // Usage:
@@ -12,16 +11,7 @@
 import { createRequire } from 'node:module'
 import { fileURLToPath } from 'node:url'
 import { dirname, resolve, join } from 'node:path'
-import {
-  chmodSync,
-  cpSync,
-  existsSync,
-  mkdirSync,
-  readdirSync,
-  readFileSync,
-  rmSync,
-  writeFileSync
-} from 'node:fs'
+import { chmodSync, cpSync, existsSync, mkdirSync, readdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
 import { spawnSync } from 'node:child_process'
 import { isMain } from './utils.mjs'
 
@@ -72,7 +62,7 @@ function copyGlobByExt(srcDir, destDir, extensions) {
       copyGlobByExt(join(srcDir, entry.name), join(destDir, entry.name), extensions)
       continue
     }
-    if (extensions.some((ext) => entry.name.endsWith(ext))) {
+    if (extensions.some(ext => entry.name.endsWith(ext))) {
       mkdirSync(destDir, { recursive: true })
       cpSync(join(srcDir, entry.name), join(destDir, entry.name))
     }
@@ -211,9 +201,7 @@ function validateStagedBinaries(destRoot, targetPlatform) {
   if (mismatches.length > 0) {
     throw new Error(
       `[stage-native-deps] native binary platform mismatch (target=${targetPlatform}):\n` +
-        mismatches
-          .map((m) => `  ${m.file}: expected ${m.expected}, got ${m.classified ?? 'unknown'}`)
-          .join('\n') +
+        mismatches.map(m => `  ${m.file}: expected ${m.expected}, got ${m.classified ?? 'unknown'}`).join('\n') +
         `\nRefusing to stage a binary compiled for the wrong platform.`
     )
   }
@@ -289,13 +277,10 @@ export function stageNodePtyInto(srcRoot, destRoot, { platform = process.platfor
   }
 
   // Check whether a native binary for this target was staged.
-  const stagedDirs = [
-    join(destRoot, 'prebuilds', `${platform}-${arch}`),
-    join(destRoot, 'build/Release')
-  ]
-  const hasNativeBinary = stagedDirs.some((dir) => {
+  const stagedDirs = [join(destRoot, 'prebuilds', `${platform}-${arch}`), join(destRoot, 'build/Release')]
+  const hasNativeBinary = stagedDirs.some(dir => {
     if (!existsSync(dir)) return false
-    return readdirSync(dir, { recursive: true }).some((name) => String(name).endsWith('.node'))
+    return readdirSync(dir, { recursive: true }).some(name => String(name).endsWith('.node'))
   })
 
   if (!hasNativeBinary) {
@@ -313,14 +298,7 @@ export function stageNodePtyInto(srcRoot, destRoot, { platform = process.platfor
       `[stage-native-deps] no native binary for ${platform}-${arch}; ` +
         `running electron-rebuild (target arch: ${arch})...`
     )
-    const rebuildArgs = [
-      '../../node_modules/.bin/electron-rebuild',
-      '-f',
-      '-w',
-      'node-pty',
-      '--arch',
-      arch
-    ]
+    const rebuildArgs = ['../../node_modules/.bin/electron-rebuild', '-f', '-w', 'node-pty', '--arch', arch]
     const result = spawnSync(process.execPath, rebuildArgs, {
       cwd: projectRoot,
       stdio: 'inherit'

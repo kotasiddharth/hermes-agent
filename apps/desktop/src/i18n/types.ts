@@ -235,6 +235,12 @@ export interface Translations {
   titlebar: {
     hideSidebar: string
     showSidebar: string
+    forward: string
+    file: string
+    edit: string
+    view: string
+    help: string
+    reload: string
     search: string
     searchTitle: string
     swapSidebarSides: string
@@ -1794,7 +1800,7 @@ export interface Translations {
     contextRemaining: (tokens: string) => string
     contextRemainingDetail: (remaining: string, total: string) => string
     contextWindow: string
-    contextWindowFull: (percent: number) => string
+    contextWindowUsageSummary: (usedPercent: number, remainingPercent: number) => string
     contextWindowUnavailable: string
     contextWindowUsage: (used: string, total: string) => string
     lookupLoading: string

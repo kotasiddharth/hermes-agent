@@ -423,6 +423,10 @@ export interface ModelOptionProvider {
 export interface ModelCapabilities {
   fast: boolean
   reasoning: boolean
+  /** Exact named reasoning levels advertised by this model. Omitted when the
+   *  gateway cannot determine them; an empty array means reasoning is
+   *  toggle/budget-only and has no discrete effort picker. */
+  reasoning_efforts?: string[]
 }
 
 export interface ModelOptionsResponse {

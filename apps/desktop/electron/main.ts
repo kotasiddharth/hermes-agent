@@ -803,9 +803,18 @@ function getWindowBackgroundColor() {
   return nativeTheme.shouldUseDarkColors ? '#111111' : '#f7f7f7'
 }
 
-// Transparent WCO — renderer chrome shows through. rgba(0,0,0,0) can fall back
-// to GetFrameColor() on some Electron builds; rgba(1,0,0,0) is the escape hatch.
-const TITLEBAR_OVERLAY_COLOR = 'rgba(1, 0, 0, 0)'
+// The native window-controls overlay must be opaque. A transparent overlay can
+// expose Windows' accent-coloured frame as a one-pixel strip above renderer
+// chrome, most noticeably with custom themes. The renderer reports the exact
+// surface used by the app's top drag bar; retain the normal window background
+// as a safe first-launch fallback before that report arrives.
+function getTitleBarOverlayColor() {
+  if (rendererTitleBarTheme && isHexColor(rendererTitleBarTheme.titleBarBackground)) {
+    return rendererTitleBarTheme.titleBarBackground
+  }
+
+  return getWindowBackgroundColor()
+}
 
 function getTitleBarOverlayOptions() {
   if (IS_MAC) {
@@ -823,7 +832,7 @@ function getTitleBarOverlayOptions() {
   }
 
   return {
-    color: TITLEBAR_OVERLAY_COLOR,
+    color: getTitleBarOverlayColor(),
     height: TITLEBAR_HEIGHT,
     symbolColor:
       rendererTitleBarTheme && isHexColor(rendererTitleBarTheme.foreground)
@@ -10885,12 +10894,18 @@ ipcMain.on('hermes:active-work', (event, payload) => {
 })
 
 ipcMain.on('hermes:titlebar-theme', (_event, payload) => {
-  if (!payload || !isHexColor(payload.background) || !isHexColor(payload.foreground)) {
+  if (
+    !payload ||
+    !isHexColor(payload.background) ||
+    !isHexColor(payload.titleBarBackground) ||
+    !isHexColor(payload.foreground)
+  ) {
     return
   }
 
   rendererTitleBarTheme = {
     background: payload.background,
+    titleBarBackground: payload.titleBarBackground,
     foreground: payload.foreground
   }
 

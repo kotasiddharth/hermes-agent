@@ -3,6 +3,14 @@ import { atom } from 'nanostores'
 export type ApprovalMode = 'manual' | 'off' | 'smart'
 export type ApprovalModeRequester = (method: string, params?: Record<string, unknown>) => Promise<unknown>
 
+/** The same display names are used by the composer, status bar, and Settings.
+ * Keeping the value-to-label mapping next to the persisted mode prevents
+ * Settings from falling back to the raw `off` enum while chat says
+ * “Full access”. */
+export function approvalModeLabels(copy: { manual: string; off: string; smart: string }): Record<ApprovalMode, string> {
+  return { manual: copy.manual, off: copy.off, smart: copy.smart }
+}
+
 const APPROVAL_MODES = new Set<ApprovalMode>(['manual', 'smart', 'off'])
 const revisions = new Map<string, number>()
 const confirmedModes = new Map<string, ApprovalMode>()

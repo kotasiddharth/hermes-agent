@@ -181,6 +181,43 @@ export function exitProjectScope(): void {
 export const projectRootCwd = (project: SidebarProjectTree | undefined): string =>
   (project?.path || project?.repos.find(repo => repo.path)?.path || '').trim()
 
+// The durable project record arrives independently of the sidebar tree. That
+// matters when a user enters a project and immediately creates a chat: the
+// project already has a folder, even if `projects.tree` is still loading its
+// repo/session structure. Prefer the explicit primary folder, then a folder
+// marked primary, then the first project folder.
+const projectInfoRootCwd = (project: ProjectInfo | undefined): string =>
+  (
+    project?.primary_path ||
+    project?.folders.find(folder => folder.is_primary)?.path ||
+    project?.folders[0]?.path ||
+    ''
+  ).trim()
+
+/**
+ * Resolve the directory shared by chats created inside a project.
+ *
+ * Explicit projects use their durable folder metadata first so a just-entered
+ * project behaves like a real folder-backed workspace before the lazy sidebar
+ * tree has arrived. Auto projects only exist in that tree, so they naturally
+ * fall back to its repo root.
+ */
+export function projectCwdForId(id: string): string {
+  const projectId = id.trim()
+
+  if (!projectId) {
+    return ''
+  }
+
+  const configuredRoot = projectInfoRootCwd($projects.get().find(project => project.id === projectId))
+
+  if (configuredRoot) {
+    return configuredRoot
+  }
+
+  return projectRootCwd($projectTree.get().find(project => project.id === projectId))
+}
+
 // ⌘K "go to project": flip the sidebar into grouped mode and enter the project
 // — a pure scope switch, same as clicking the overview row (never spends main).
 // With `newSession` (⌘-select / ⌘-Enter) it also lands on a fresh session draft
@@ -195,7 +232,7 @@ export function goToProject(id: string, options?: { newSession?: boolean }): voi
     return
   }
 
-  const cwd = projectRootCwd($projectTree.get().find(node => node.id === id))
+  const cwd = projectCwdForId(id)
 
   if (cwd) {
     requestStartWorkSession(cwd, undefined, { openTab: true })
@@ -208,15 +245,18 @@ export function goToProject(id: string, options?: { newSession?: boolean }): voi
 //
 // Priority (first hit wins):
 //   1. Explicit sidebar project scope (drilled into a project / Home bucket)
-//   2. The FOCUSED session's workspace — so ⌘N / ⌘T from a chat that's already
-//      in a project/worktree stay there without requiring a sidebar drill-in
-//   3. Configured default project dir / remote remembered cwd (detached otherwise)
+//   2. The PROJECT ROOT owning the focused chat — every chat in a folder-backed
+//      project shares its chosen directory, even when the focused chat happens
+//      to be in a linked worktree
+//   3. The focused chat's workspace when it belongs to no project
+//   4. Configured default project dir / remote remembered cwd (detached otherwise)
 //
 // The "active project" is just an atom ($projectScope) — so when you're inside
 // a project, a new session (cmd-n, the trunk "+") starts at that project's root
-// (its primary repo = the default-branch checkout). Outside a project it used
-// to fall straight to the plain default (detached), which dropped the workspace
-// of the chat you were looking at — that's the case (2) covers.
+// (its primary repo = the default-branch checkout). Outside a project, a chat
+// that belongs to a known project still resolves back to that same root. An
+// unprojected focused chat keeps its own cwd instead of falling straight to the
+// default directory.
 export function resolveNewSessionCwd(): string {
   const scope = $projectScope.get()
 
@@ -227,20 +267,20 @@ export function resolveNewSessionCwd(): string {
   }
 
   if (scope !== ALL_PROJECTS) {
-    const cwd = projectRootCwd($projectTree.get().find(node => node.id === scope))
+    const cwd = projectCwdForId(scope)
 
     if (cwd) {
       return cwd
     }
   }
 
-  // Inherit the focused chat's workspace. ⌘N/⌘T from a session that already
-  // has a project/pwd should stay there — drilling into the sidebar project
-  // is the uncommon path, not the requirement.
+  // A folder-backed project owns its new chats: even when the focused chat is
+  // running in a linked worktree, Ctrl/⌘N and Ctrl/⌘T return to the project's
+  // shared root. Unprojected chats still inherit their own cwd.
   const focusedCwd = focusedSessionWorkspaceCwd()
 
   if (focusedCwd) {
-    return focusedCwd
+    return projectCwdForId(projectIdForCwd(focusedCwd) ?? '') || focusedCwd
   }
 
   return workspaceCwdForNewSession()
@@ -286,12 +326,45 @@ function focusedSessionWorkspaceCwd(): string {
   return $currentCwd.get().trim()
 }
 
-const underPath = (parent: string, child: string): boolean =>
-  child === parent || child.startsWith(parent.endsWith('/') ? parent : `${parent}/`)
+const isWindowsPath = (path: string): boolean =>
+  /^[A-Za-z]:[/\\]/.test(path) || path.startsWith('\\') || path.startsWith('//')
+
+const normalizedPath = (path: string): string => {
+  const normalized = path.trim().replace(/\\/g, '/')
+
+  return isWindowsPath(path) ? normalized.toLowerCase() : normalized
+}
+
+const pathSegments = (path: string): string[] => {
+  const segments = normalizedPath(path).split('/').filter(Boolean)
+
+  return segments
+}
+
+const underPath = (parent: string, child: string): boolean => {
+  const normalizedParent = normalizedPath(parent)
+  const normalizedChild = normalizedPath(child)
+  const parentSegments = pathSegments(parent)
+  const childSegments = pathSegments(child)
+
+  // A project may deliberately use the POSIX filesystem root. It has no path
+  // segments after splitting, but it still owns every absolute POSIX path.
+  if (normalizedParent === '/') {
+    return normalizedChild.startsWith('/')
+  }
+
+  return (
+    parentSegments.length > 0 &&
+    parentSegments.length <= childSegments.length &&
+    parentSegments.every((segment, index) => segment === childSegments[index])
+  )
+}
 
 // The project (explicit or auto) that owns `cwd`, by longest path match across
-// the live tree. Null when no project covers it (it'll surface as a fresh
-// auto-project on the next tree refresh).
+// the live tree and durable explicit-project folders. The metadata fallback
+// keeps folder-backed project behavior intact before the lazy tree arrives.
+// Null when no project covers it (it'll surface as a fresh auto-project on the
+// next tree refresh).
 export function projectIdForCwd(cwd: string): null | string {
   let best: null | string = null
   let bestLen = -1
@@ -301,6 +374,26 @@ export function projectIdForCwd(cwd: string): null | string {
     // (e.g. a sibling `repo-retry`) lives OUTSIDE the repo root, so root-prefix
     // matching alone would miss it — but it's still part of the project.
     const paths = [project.path, ...project.repos.flatMap(repo => [repo.path, ...repo.groups.map(group => group.path)])]
+
+    for (const path of paths) {
+      const p = (path || '').trim()
+
+      if (p && underPath(p, cwd) && p.length > bestLen) {
+        bestLen = p.length
+        best = project.id
+      }
+    }
+  }
+
+  // `projects.list` is a much smaller, earlier fetch than `projects.tree`.
+  // Check its explicit folders too so Ctrl/⌘N and Ctrl/⌘T still normalize a
+  // nested chat to its project's root while the tree is loading.
+  for (const project of $projects.get()) {
+    if (project.archived) {
+      continue
+    }
+
+    const paths = [project.primary_path, ...project.folders.map(folder => folder.path)]
 
     for (const path of paths) {
       const p = (path || '').trim()

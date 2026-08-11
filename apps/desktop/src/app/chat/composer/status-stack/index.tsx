@@ -238,13 +238,14 @@ export function ComposerStatusStack({ queue, sessionId }: ComposerStatusStackPro
       {sections.length > 0 && (
         <div
           className={cn(
-            composerDockCard('top'),
+            composerDockCard('full'),
             // Inset (mx-2) so the stack reads slightly narrower than the composer
             // surface below it — the original look.
-            'mx-2 overflow-hidden rounded-b-none border-b border-b-transparent pt-0.5',
+            'mx-2 mb-1.5 overflow-hidden pt-0.5',
             'transition-opacity duration-200 ease-out',
             scrolledUp ? 'opacity-30 group-hover/composer:opacity-100' : 'opacity-100'
           )}
+          data-slot="composer-status-card"
         >
           {sections.map(section => (
             <div key={section.key}>{section.node}</div>

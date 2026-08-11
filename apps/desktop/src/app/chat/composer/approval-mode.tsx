@@ -7,7 +7,6 @@ import {
 import { Button } from '@/components/ui/button'
 import { DropdownMenu, DropdownMenuContent, DropdownMenuTrigger } from '@/components/ui/dropdown-menu'
 import { Tip } from '@/components/ui/tooltip'
-import { ChevronDown } from '@/lib/icons'
 import { cn } from '@/lib/utils'
 import type { ApprovalModeRequester } from '@/store/approval-mode'
 
@@ -35,7 +34,7 @@ export function ComposerApprovalMode({
           <Button
             aria-label={menu.ariaLabel}
             className={cn(
-              'h-7 gap-1 rounded-[var(--radius-sm)] px-1.5 py-0 text-[0.6875rem] font-medium text-(--ui-text-secondary)',
+              'h-7 gap-1 rounded-full px-2 py-0 text-[0.6875rem] font-medium text-(--ui-text-secondary)',
               'hover:bg-(--chrome-action-hover) hover:text-foreground data-[state=open]:bg-(--chrome-action-hover) data-[state=open]:text-foreground'
             )}
             data-approval-mode={menu.mode}
@@ -47,7 +46,6 @@ export function ComposerApprovalMode({
           >
             <ApprovalModeGlyph className="size-3" mode={menu.mode} />
             <span className={cn('max-w-24 truncate', approvalModeToneClass[menu.mode])}>{menu.labels[menu.mode]}</span>
-            <ChevronDown className="size-3 text-(--ui-text-tertiary)" />
           </Button>
         </DropdownMenuTrigger>
       </Tip>

@@ -1,4 +1,5 @@
 """Tests for agent.models_dev — models.dev registry integration."""
+
 import threading
 import time
 from concurrent.futures import ThreadPoolExecutor
@@ -108,17 +109,12 @@ class TestProviderMapping:
         assert "nous" not in PROVIDER_TO_MODELS_DEV
 
 
-
 class TestExtractContext:
     def test_valid_entry(self):
         assert _extract_context({"limit": {"context": 128000}}) == 128000
 
-
-
-
     def test_non_dict_returns_none(self):
         assert _extract_context("not a dict") is None
-
 
 
 class TestLookupModelsDevContext:
@@ -127,18 +123,12 @@ class TestLookupModelsDevContext:
         mock_fetch.return_value = SAMPLE_REGISTRY
         assert lookup_models_dev_context("anthropic", "claude-opus-4-6") == 1000000
 
-
-
-
-
-
     @patch("agent.models_dev.fetch_models_dev")
     def test_zero_context_filtered(self, mock_fetch):
         mock_fetch.return_value = SAMPLE_REGISTRY
         # audio-only is not a mapped provider, but test the filtering directly
         data = SAMPLE_REGISTRY["audio-only"]["models"]["tts-model"]
         assert _extract_context(data) is None
-
 
 
 class TestFetchModelsDev:
@@ -156,29 +146,28 @@ class TestFetchModelsDev:
         md._models_dev_retry_after = 0
         md._models_dev_refresh_in_flight = False
 
-
-
-
-
-
     @patch("agent.models_dev.requests.get")
     def test_stale_disk_cache_returns_without_foreground_network(self, mock_get):
         """#35838: stale disk cache should not wait on models.dev timeout."""
         import agent.models_dev as md
+
         md._models_dev_cache = {}
         md._models_dev_cache_time = 0
 
-        with patch.object(md, "_disk_cache_age_seconds",
-                          return_value=md._MODELS_DEV_CACHE_TTL + 60), \
-             patch.object(md, "_load_disk_cache", return_value=SAMPLE_REGISTRY), \
-             patch.object(md, "_start_background_refresh_models_dev") as mock_refresh:
+        with (
+            patch.object(
+                md,
+                "_disk_cache_age_seconds",
+                return_value=md._MODELS_DEV_CACHE_TTL + 60,
+            ),
+            patch.object(md, "_load_disk_cache", return_value=SAMPLE_REGISTRY),
+            patch.object(md, "_start_background_refresh_models_dev") as mock_refresh,
+        ):
             result = fetch_models_dev()
 
         mock_get.assert_not_called()
         mock_refresh.assert_called_once()
         assert "anthropic" in result
-
-
 
     @patch("agent.models_dev.requests.get")
     def test_stale_cache_failure_enters_backoff_and_suppresses_retry(self, mock_get):
@@ -188,11 +177,14 @@ class TestFetchModelsDev:
         md._models_dev_cache = SAMPLE_REGISTRY
         md._models_dev_cache_time = time.time() - md._MODELS_DEV_CACHE_TTL - 1
 
-        with patch.object(
-            md,
-            "_disk_cache_age_seconds",
-            return_value=md._MODELS_DEV_CACHE_TTL + 60,
-        ), patch.object(md, "_load_disk_cache", return_value=SAMPLE_REGISTRY):
+        with (
+            patch.object(
+                md,
+                "_disk_cache_age_seconds",
+                return_value=md._MODELS_DEV_CACHE_TTL + 60,
+            ),
+            patch.object(md, "_load_disk_cache", return_value=SAMPLE_REGISTRY),
+        ):
             first = fetch_models_dev()
             # Join the background refresh worker so its failure backoff is
             # observable and requests.get stays patched for its lifetime.
@@ -239,7 +231,6 @@ class TestFetchModelsDev:
         assert md._models_dev_retry_after == 0
         assert not md._models_dev_refresh_in_flight
 
-
     @patch("agent.models_dev.requests.get")
     def test_concurrent_refreshes_share_one_network_request(self, mock_get):
         import agent.models_dev as md
@@ -255,9 +246,11 @@ class TestFetchModelsDev:
             return response
 
         mock_get.side_effect = blocking_get
-        with patch.object(md, "_disk_cache_age_seconds", return_value=None), patch.object(
-            md, "_save_disk_cache"
-        ), ThreadPoolExecutor(max_workers=6) as pool:
+        with (
+            patch.object(md, "_disk_cache_age_seconds", return_value=None),
+            patch.object(md, "_save_disk_cache"),
+            ThreadPoolExecutor(max_workers=6) as pool,
+        ):
             futures = [pool.submit(fetch_models_dev) for _ in range(6)]
             assert request_started.wait(timeout=2)
             release_request.set()
@@ -274,9 +267,11 @@ class TestFetchModelsDev:
         response.json.return_value = SAMPLE_REGISTRY
         mock_get.side_effect = [OSError("models.dev unreachable"), response]
 
-        with patch.object(md, "_disk_cache_age_seconds", return_value=None), patch.object(
-            md, "_load_disk_cache", return_value={}
-        ), patch.object(md, "_save_disk_cache"):
+        with (
+            patch.object(md, "_disk_cache_age_seconds", return_value=None),
+            patch.object(md, "_load_disk_cache", return_value={}),
+            patch.object(md, "_save_disk_cache"),
+        ):
             assert fetch_models_dev() == {}
             assert fetch_models_dev(force_refresh=True) == SAMPLE_REGISTRY
 
@@ -310,11 +305,6 @@ class TestFetchModelsDev:
 
         assert result == expected
         mock_get.assert_not_called()
-
-
-
-
-
 
 
 # ---------------------------------------------------------------------------
@@ -371,22 +361,94 @@ class TestGetModelCapabilities:
         assert caps is not None
         assert caps.supports_vision is True
 
+    def test_extracts_exact_reasoning_effort_values(self):
+        registry = {
+            "openai": {
+                "id": "openai",
+                "models": {
+                    "gpt-test": {
+                        "id": "gpt-test",
+                        "reasoning": True,
+                        "reasoning_options": [
+                            {"type": "toggle"},
+                            {
+                                "type": "effort",
+                                "values": [
+                                    "low",
+                                    "high",
+                                    "max",
+                                    "none",
+                                    "high",
+                                    "bogus",
+                                ],
+                            },
+                        ],
+                    }
+                },
+            }
+        }
+        with patch("agent.models_dev.fetch_models_dev", return_value=registry):
+            caps = get_model_capabilities("openai", "gpt-test")
 
+        assert caps is not None
+        assert caps.reasoning_efforts == ("low", "high", "max")
 
+    def test_marks_toggle_only_reasoning_as_having_no_effort_ladder(self):
+        registry = {
+            "openai": {
+                "id": "openai",
+                "models": {
+                    "gpt-toggle": {
+                        "id": "gpt-toggle",
+                        "reasoning": True,
+                        "reasoning_options": {"type": "toggle"},
+                    }
+                },
+            }
+        }
+        with patch("agent.models_dev.fetch_models_dev", return_value=registry):
+            caps = get_model_capabilities("openai", "gpt-toggle")
+
+        assert caps is not None
+        assert caps.reasoning_efforts == ()
+
+    def test_resolves_nous_routed_free_model_against_openrouter_metadata(self):
+        registry = {
+            "openrouter": {
+                "id": "openrouter",
+                "models": {
+                    "tencent/hy3": {
+                        "id": "tencent/hy3",
+                        "reasoning": True,
+                        "reasoning_options": {
+                            "type": "effort",
+                            "values": ["low", "medium", "high"],
+                        },
+                    }
+                },
+            }
+        }
+        with patch("agent.models_dev.fetch_models_dev", return_value=registry):
+            caps = get_model_capabilities("nous", "tencent/hy3:free")
+
+        assert caps is not None
+        assert caps.reasoning_efforts == ("low", "medium", "high")
 
     def test_modalities_non_dict_handled(self):
         """Non-dict modalities field should not crash."""
         registry = {
-            "google": {"id": "google", "models": {
-                "weird-model": {
-                    "id": "weird-model",
-                    "modalities": "text",  # not a dict
-                    "limit": {"context": 200000, "output": 8192},
+            "google": {
+                "id": "google",
+                "models": {
+                    "weird-model": {
+                        "id": "weird-model",
+                        "modalities": "text",  # not a dict
+                        "limit": {"context": 200000, "output": 8192},
+                    },
                 },
-            }},
+            },
         }
         with patch("agent.models_dev.fetch_models_dev", return_value=registry):
             caps = get_model_capabilities("gemini", "weird-model")
         assert caps is not None
         assert caps.supports_vision is False
-

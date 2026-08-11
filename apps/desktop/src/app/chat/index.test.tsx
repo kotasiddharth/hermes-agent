@@ -1,10 +1,12 @@
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { cleanup, fireEvent, render, screen } from '@testing-library/react'
+import { atom } from 'nanostores'
 import { useState } from 'react'
 import { MemoryRouter } from 'react-router'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 import { assistantTextPart, type ChatMessage } from '@/lib/chat-messages'
+import { mainComposerScope } from '@/store/composer'
 import {
   $activeSessionId,
   $awaitingResponse,
@@ -20,14 +22,19 @@ import {
   $sessions
 } from '@/store/session'
 
+import { ComposerScopeProvider } from './composer/scope'
+import { type SessionView, SessionViewProvider } from './session-view'
+
 const threadRenderCount = vi.hoisted(() => ({ current: 0 }))
+const lastThreadIntro = vi.hoisted(() => ({ current: undefined as undefined | { compact?: boolean } }))
 
 vi.mock('@/components/assistant-ui/thread', async () => {
   const React = await import('react')
 
   return {
-    Thread: () => {
+    Thread: ({ intro }: { intro?: { compact?: boolean } }) => {
       threadRenderCount.current += 1
+      lastThreadIntro.current = intro
 
       return React.createElement('div', { 'data-testid': 'thread' })
     }
@@ -68,6 +75,7 @@ function assistantMessage(id: string, text: string): ChatMessage {
 describe('ChatView render isolation', () => {
   beforeEach(() => {
     threadRenderCount.current = 0
+    lastThreadIntro.current = undefined
     $activeSessionId.set('runtime-1')
     $awaitingResponse.set(false)
     $busy.set(false)
@@ -85,6 +93,7 @@ describe('ChatView render isolation', () => {
   afterEach(() => {
     cleanup()
     vi.restoreAllMocks()
+    lastThreadIntro.current = undefined
     $activeSessionId.set(null)
     $awaitingResponse.set(false)
     $busy.set(false)
@@ -154,5 +163,73 @@ describe('ChatView render isolation', () => {
     // memo(ChatView) with stable props must absorb the parent's idle tick —
     // the transcript (Thread) must not re-render. This is PR #38470's contract.
     expect(threadRenderCount.current).toBe(1)
+  })
+
+  it('gives an empty Ctrl/⌘T session tab a compact intro instead of a blank canvas', () => {
+    const tileMessages = atom<ChatMessage[]>([])
+
+    const tileView: SessionView = {
+      kind: 'tile',
+      $awaitingResponse: atom(false),
+      $busy: atom(false),
+      $cwd: atom(''),
+      $fast: atom(false),
+      $lastVisibleIsUser: atom(false),
+      $messages: tileMessages,
+      $messagesEmpty: atom(true),
+      $model: atom('test-model'),
+      $provider: atom('test-provider'),
+      $reasoningEffort: atom(''),
+      $runtimeId: atom('tile-runtime'),
+      $storedId: atom('stored-tile'),
+      $usage: atom(null)
+    }
+
+    const props = {
+      gateway: null,
+      maxVoiceRecordingSeconds: 120,
+      onAddContextRef: vi.fn(),
+      onAddUrl: vi.fn(),
+      onAttachDroppedItems: vi.fn(),
+      onAttachImageBlob: vi.fn(),
+      onCancel: vi.fn(),
+      onDeleteSelectedSession: vi.fn(),
+      onEdit: vi.fn(),
+      onPasteClipboardImage: vi.fn(),
+      onPickFiles: vi.fn(),
+      onPickFolders: vi.fn(),
+      onPickImages: vi.fn(),
+      onReload: vi.fn(),
+      onRemoveAttachment: vi.fn(),
+      onRetryResume: vi.fn(),
+      onSteer: vi.fn(),
+      onSubmit: vi.fn(),
+      onThreadMessagesChange: vi.fn(),
+      onToggleSelectedPin: vi.fn(),
+      onTranscribeAudio: vi.fn()
+    }
+
+    const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } })
+
+    render(
+      <QueryClientProvider client={queryClient}>
+        <MemoryRouter initialEntries={['/']}>
+          <SessionViewProvider value={tileView}>
+            <ComposerScopeProvider
+              value={{
+                $awaitingInput: atom(false),
+                $messages: tileMessages,
+                attachments: mainComposerScope,
+                target: 'tile:stored-tile'
+              }}
+            >
+              <ChatView {...props} />
+            </ComposerScopeProvider>
+          </SessionViewProvider>
+        </MemoryRouter>
+      </QueryClientProvider>
+    )
+
+    expect(lastThreadIntro.current).toEqual(expect.objectContaining({ compact: true }))
   })
 })

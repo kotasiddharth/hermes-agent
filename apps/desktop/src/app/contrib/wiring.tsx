@@ -111,7 +111,7 @@ import { useSessionStateCache } from '../session/hooks/use-session-state-cache'
 import { startWorkspaceSession } from '../session/workspace-session-target'
 import { useOverlayRouting } from '../shell/hooks/use-overlay-routing'
 import { useWindowControlsOverlayWidth } from '../shell/hooks/use-window-controls-overlay-width'
-import { titlebarControlsPosition } from '../shell/titlebar'
+import { TITLEBAR_LEADING_CONTROL_COUNT, TITLEBAR_MENU_BAR_WIDTH, titlebarControlsPosition } from '../shell/titlebar'
 import { TitlebarControls } from '../shell/titlebar-controls'
 import { UpdatesOverlay } from '../updates-overlay'
 
@@ -952,6 +952,7 @@ export function ContribWiring({ children }: { children: ReactNode }) {
   const leftTitlebarTools = useTitlebarToolContributions('left')
   const rightTitlebarTools = useTitlebarToolContributions('right')
   const connection = useStore($connection)
+  const showTitlebarMenus = connection?.windowButtonPosition === null
   const controlsPos = titlebarControlsPosition(connection?.windowButtonPosition, Boolean(connection?.isFullscreen))
   // Exact vertical centering: titlebarControlsPosition() returns
   // (TITLEBAR_HEIGHT - TITLEBAR_CONTROL_HEIGHT) / 2, but TitlebarControls
@@ -975,6 +976,9 @@ export function ContribWiring({ children }: { children: ReactNode }) {
       ? `calc(${systemToolsWidth} + ${paneToolCount} * (var(--titlebar-control-size) + 0.25rem))`
       : systemToolsWidth
 
+  const visibleLeftToolCount = leftTitlebarTools.filter(tool => !tool.hidden).length
+  const titlebarLeftControlsWidth = `calc(${TITLEBAR_LEADING_CONTROL_COUNT + visibleLeftToolCount} * (var(--titlebar-control-size) + 0.25rem)${showTitlebarMenus ? ` + ${TITLEBAR_MENU_BAR_WIDTH}` : ''})`
+
   return (
     <ContribWiringContext.Provider value={api}>
       <DesktopIntegrationsBridge
@@ -995,6 +999,8 @@ export function ContribWiring({ children }: { children: ReactNode }) {
           {
             '--titlebar-controls-left': `${controlsPos.left}px`,
             '--titlebar-controls-top': `${controlsPos.top - controlsTranslateY}px`,
+            '--titlebar-content-inset': `calc(var(--titlebar-controls-left) + ${titlebarLeftControlsWidth} + 0.75rem)`,
+            '--titlebar-left-controls-width': titlebarLeftControlsWidth,
             '--titlebar-tools-right': titlebarToolsRight,
             '--titlebar-tools-width': titlebarToolsWidth,
             '--shell-preview-toolbar-gap': systemToolsWidth
@@ -1004,6 +1010,7 @@ export function ContribWiring({ children }: { children: ReactNode }) {
         <TitlebarControls
           leftTools={leftTitlebarTools}
           onOpenSettings={() => navigate(SETTINGS_ROUTE)}
+          showAppMenu={showTitlebarMenus}
           tools={rightTitlebarTools}
         />
         {children}

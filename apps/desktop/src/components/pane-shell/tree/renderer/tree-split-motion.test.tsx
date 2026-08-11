@@ -64,7 +64,7 @@ describe('TreeSplit sidebar motion', () => {
     const { container } = render(<TreeSplit node={node} root rootRow />)
     const track = container.querySelector<HTMLElement>('[data-tree-track="sessions-track"]')!
 
-    expect(track.className).toContain('transition-[flex-basis,flex-grow,opacity]')
+    expect(track.className).toContain('transition-[flex-basis,flex-grow,opacity,transform]')
     expect(track.style.display).toBe('')
 
     act(() => {
@@ -74,6 +74,7 @@ describe('TreeSplit sidebar motion', () => {
     expect(track.dataset.collapsed).toBe('true')
     expect(track.style.flex).toBe('0 0 0px')
     expect(track.style.opacity).toBe('0')
+    expect(track.style.transform).toBe('translateX(-0.625rem)')
     expect(track.style.display).toBe('')
     expect(track.hasAttribute('inert')).toBe(true)
 

@@ -40,10 +40,6 @@ def _cfg(model=None, providers=None, custom_providers=None) -> dict:
     }
 
 
-
-
-
-
 # ─── with_overrides ────────────────────────────────────────────────────
 
 
@@ -55,10 +51,6 @@ def _empty_ctx(provider="orig", model="orig-model", base_url="orig-url"):
         user_providers={},
         custom_providers=[],
     )
-
-
-
-
 
 
 # ─── build_models_payload ──────────────────────────────────────────────
@@ -82,8 +74,6 @@ def _nous_row(model: str = "openai/gpt-5.5") -> dict:
         "is_user_defined": False,
         "source": "built-in",
     }
-
-
 
 
 def test_cli_model_picker_forwards_force_refresh_to_probe_flags():
@@ -141,6 +131,44 @@ def test_list_authenticated_providers_force_fresh_is_keyword_only():
     assert param.default is False
 
 
+def test_capabilities_forward_exact_model_reasoning_efforts():
+    """Desktop pickers must receive the model-level effort catalog, not just
+    a coarse reasoning boolean that expands into Hermes' entire ladder."""
+    from hermes_cli import inventory
+
+    class _Capabilities:
+        supports_reasoning = True
+        reasoning_efforts = ("low", "medium", "high")
+
+    rows = [{"slug": "tencent", "models": ["hy3"]}]
+    with (
+        patch("hermes_cli.models.model_supports_fast_mode", return_value=False),
+        patch("agent.models_dev.get_model_capabilities", return_value=_Capabilities()),
+    ):
+        inventory._apply_capabilities(rows)
+
+    assert rows[0]["capabilities"]["hy3"] == {
+        "fast": False,
+        "reasoning": True,
+        "reasoning_efforts": ["low", "medium", "high"],
+    }
+
+
+def test_capabilities_preserve_toggle_only_reasoning_without_fake_levels():
+    from hermes_cli import inventory
+
+    class _Capabilities:
+        supports_reasoning = True
+        reasoning_efforts = ()
+
+    rows = [{"slug": "zai", "models": ["glm-toggle"]}]
+    with (
+        patch("hermes_cli.models.model_supports_fast_mode", return_value=False),
+        patch("agent.models_dev.get_model_capabilities", return_value=_Capabilities()),
+    ):
+        inventory._apply_capabilities(rows)
+
+    assert rows[0]["capabilities"]["glm-toggle"]["reasoning_efforts"] == []
 
 
 def test_include_unconfigured_appends_canonical_skeletons():
@@ -148,9 +176,15 @@ def test_include_unconfigured_appends_canonical_skeletons():
     list_authenticated_providers didn't emit. Skeleton rows have empty
     models and source='canonical'."""
     rows = [
-        {"slug": "openrouter", "name": "OpenRouter", "models": ["m1"],
-         "total_models": 1, "is_current": True, "is_user_defined": False,
-         "source": "built-in"},
+        {
+            "slug": "openrouter",
+            "name": "OpenRouter",
+            "models": ["m1"],
+            "total_models": 1,
+            "is_current": True,
+            "is_user_defined": False,
+            "source": "built-in",
+        },
     ]
     ctx = _empty_ctx(provider="openrouter")
     with _list_auth_returning(rows):
@@ -163,32 +197,67 @@ def test_include_unconfigured_appends_canonical_skeletons():
     for entry in CANONICAL_PROVIDERS:
         assert entry.slug in seen_slugs, f"missing {entry.slug}"
     # Skeletons have empty models and source='canonical'.
-    skeletons = [r for r in payload["providers"]
-                 if r.get("source") == "canonical"]
+    skeletons = [r for r in payload["providers"] if r.get("source") == "canonical"]
     assert all(r["models"] == [] for r in skeletons)
     assert all(r["total_models"] == 0 for r in skeletons)
 
 
 def test_explicit_only_filters_ambient_credentials_but_keeps_current_and_custom_rows():
     rows = [
-        {"slug": "openai-codex", "name": "OpenAI Codex", "models": ["gpt-5.4"],
-         "total_models": 1, "is_current": True, "is_user_defined": False,
-         "source": "hermes"},
-        {"slug": "gemini", "name": "Gemini", "models": ["gemini-2.5-pro"],
-         "total_models": 1, "is_current": False, "is_user_defined": False,
-         "source": "built-in"},
-        {"slug": "copilot", "name": "Copilot", "models": ["gpt-5.4"],
-         "total_models": 1, "is_current": False, "is_user_defined": False,
-         "source": "hermes"},
-        {"slug": "nous", "name": "Nous", "models": ["anthropic/claude-sonnet-5"],
-         "total_models": 1, "is_current": False, "is_user_defined": False,
-         "source": "hermes"},
-        {"slug": "custom:lab", "name": "Lab", "models": ["lab-1"],
-         "total_models": 1, "is_current": False, "is_user_defined": True,
-         "source": "user-config"},
-        {"slug": "moa", "name": "MoA", "models": ["default"],
-         "total_models": 1, "is_current": False, "is_user_defined": False,
-         "source": "virtual"},
+        {
+            "slug": "openai-codex",
+            "name": "OpenAI Codex",
+            "models": ["gpt-5.4"],
+            "total_models": 1,
+            "is_current": True,
+            "is_user_defined": False,
+            "source": "hermes",
+        },
+        {
+            "slug": "gemini",
+            "name": "Gemini",
+            "models": ["gemini-2.5-pro"],
+            "total_models": 1,
+            "is_current": False,
+            "is_user_defined": False,
+            "source": "built-in",
+        },
+        {
+            "slug": "copilot",
+            "name": "Copilot",
+            "models": ["gpt-5.4"],
+            "total_models": 1,
+            "is_current": False,
+            "is_user_defined": False,
+            "source": "hermes",
+        },
+        {
+            "slug": "nous",
+            "name": "Nous",
+            "models": ["anthropic/claude-sonnet-5"],
+            "total_models": 1,
+            "is_current": False,
+            "is_user_defined": False,
+            "source": "hermes",
+        },
+        {
+            "slug": "custom:lab",
+            "name": "Lab",
+            "models": ["lab-1"],
+            "total_models": 1,
+            "is_current": False,
+            "is_user_defined": True,
+            "source": "user-config",
+        },
+        {
+            "slug": "moa",
+            "name": "MoA",
+            "models": ["default"],
+            "total_models": 1,
+            "is_current": False,
+            "is_user_defined": False,
+            "source": "virtual",
+        },
     ]
     ctx = _empty_ctx(provider="openai-codex", model="gpt-5.4")
     with (
@@ -208,15 +277,20 @@ def test_explicit_only_filters_ambient_credentials_but_keeps_current_and_custom_
     ]
 
 
-
 # ─── picker_hints ──────────────────────────────────────────────────────
 
 
 def test_picker_hints_marks_authed_rows_authenticated():
     rows = [
-        {"slug": "openrouter", "name": "OpenRouter", "models": ["m1"],
-         "total_models": 1, "is_current": True, "is_user_defined": False,
-         "source": "built-in"},
+        {
+            "slug": "openrouter",
+            "name": "OpenRouter",
+            "models": ["m1"],
+            "total_models": 1,
+            "is_current": True,
+            "is_user_defined": False,
+            "source": "built-in",
+        },
     ]
     ctx = _empty_ctx()
     with _list_auth_returning(rows):
@@ -231,12 +305,12 @@ def test_picker_hints_api_key_warning_format():
     ctx = _empty_ctx()
     with _list_auth_returning(rows):
         payload = build_models_payload(
-            ctx, include_unconfigured=True, picker_hints=True,
+            ctx,
+            include_unconfigured=True,
+            picker_hints=True,
         )
     # anthropic uses api_key + ANTHROPIC_API_KEY.
-    anthropic = next(
-        r for r in payload["providers"] if r["slug"] == "anthropic"
-    )
+    anthropic = next(r for r in payload["providers"] if r["slug"] == "anthropic")
     assert "ANTHROPIC_API_KEY" in anthropic["warning"]
     assert anthropic["warning"].startswith("paste ")
 
@@ -256,14 +330,26 @@ def test_canonical_order_uses_slug_not_is_user_defined_flag():
     canonical_slug = CANONICAL_PROVIDERS[2].slug  # any canonical
     rows = [
         # A truly-custom row (correct: is_user_defined=True)
-        {"slug": "custom:Ollama", "name": "Ollama", "models": [],
-         "total_models": 0, "is_current": False, "is_user_defined": True,
-         "source": "user-config"},
+        {
+            "slug": "custom:Ollama",
+            "name": "Ollama",
+            "models": [],
+            "total_models": 0,
+            "is_current": False,
+            "is_user_defined": True,
+            "source": "user-config",
+        },
         # A canonical row that the substrate flagged as user-defined
         # because the user configured it via providers: dict.
-        {"slug": canonical_slug, "name": "x", "models": ["m1"],
-         "total_models": 1, "is_current": False, "is_user_defined": True,
-         "source": "built-in"},
+        {
+            "slug": canonical_slug,
+            "name": "x",
+            "models": ["m1"],
+            "total_models": 1,
+            "is_current": False,
+            "is_user_defined": True,
+            "source": "built-in",
+        },
     ]
     ctx = _empty_ctx()
     with _list_auth_returning(rows):
@@ -277,8 +363,6 @@ def test_canonical_order_uses_slug_not_is_user_defined_flag():
         f"canonical {canonical_slug} demoted to tail "
         f"(canonical_idx={canonical_idx} > custom_idx={custom_idx})"
     )
-
-
 
 
 # ─── Integration: end-to-end through real load_picker_context ──────────
@@ -295,7 +379,9 @@ def test_end_to_end_with_real_context_no_credentials_leak(monkeypatch):
     with patch("hermes_cli.config.load_config", return_value=cfg):
         ctx = load_picker_context()
     payload = build_models_payload(
-        ctx, include_unconfigured=True, picker_hints=True,
+        ctx,
+        include_unconfigured=True,
+        picker_hints=True,
     )
     import json as _json
 
@@ -308,17 +394,31 @@ def test_payload_shape_compatible_with_modelpickerdialog_frontend():
     Verify every authenticated/skeleton row exposes those keys.
     """
     rows = [
-        {"slug": "openrouter", "name": "OpenRouter", "models": ["m1"],
-         "total_models": 1, "is_current": True, "is_user_defined": False,
-         "source": "built-in"},
+        {
+            "slug": "openrouter",
+            "name": "OpenRouter",
+            "models": ["m1"],
+            "total_models": 1,
+            "is_current": True,
+            "is_user_defined": False,
+            "source": "built-in",
+        },
     ]
     ctx = _empty_ctx()
     with _list_auth_returning(rows):
         payload = build_models_payload(
-            ctx, include_unconfigured=True, picker_hints=True,
+            ctx,
+            include_unconfigured=True,
+            picker_hints=True,
         )
-    required_keys = {"name", "slug", "models", "total_models", "is_current",
-                     "authenticated"}
+    required_keys = {
+        "name",
+        "slug",
+        "models",
+        "total_models",
+        "is_current",
+        "authenticated",
+    }
     for row in payload["providers"]:
         missing = required_keys - row.keys()
         assert not missing, f"row {row['slug']} missing keys: {missing}"
@@ -356,15 +456,21 @@ def test_aggregator_dedup_removes_overlapping_models():
     aggregator rows so the picker doesn't show them under the wrong
     provider.  (#45954)"""
     rows = [
-        _user_provider_row("litellm-proxy", [
-            "nvidia/nim/minimax-m3",
-            "nvidia/nim/kimi-k2.6",
-        ]),
-        _aggregator_row("openrouter", [
-            "minimax/minimax-m3",
-            "nvidia/nim/minimax-m3",  # overlaps with litellm-proxy
-            "anthropic/claude-sonnet-4.6",
-        ]),
+        _user_provider_row(
+            "litellm-proxy",
+            [
+                "nvidia/nim/minimax-m3",
+                "nvidia/nim/kimi-k2.6",
+            ],
+        ),
+        _aggregator_row(
+            "openrouter",
+            [
+                "minimax/minimax-m3",
+                "nvidia/nim/minimax-m3",  # overlaps with litellm-proxy
+                "anthropic/claude-sonnet-4.6",
+            ],
+        ),
     ]
     ctx = _empty_ctx()
     with _list_auth_returning(rows):
@@ -383,8 +489,6 @@ def test_aggregator_dedup_removes_overlapping_models():
     assert or_row["total_models"] == 2
 
 
-
-
 def test_flat_namespace_reseller_keeps_first_party_models_overlapping_user_proxy():
     """opencode-go / opencode-zen are flagged ``is_aggregator=True`` (their
     flat ``/v1/models`` returns bare IDs the model-switch resolver searches),
@@ -397,13 +501,26 @@ def test_flat_namespace_reseller_keeps_first_party_models_overlapping_user_proxy
     custom provider.
     """
     rows = [
-        _user_provider_row("custom:my-proxy", [
-            "minimax-m3", "minimax-m2.7", "glm-5", "deepseek-v4-flash",
-        ]),
-        _aggregator_row("opencode-go", [
-            "kimi-k2.6", "minimax-m3", "minimax-m2.7", "glm-5",
-            "deepseek-v4-flash", "qwen3.7-max",
-        ]),
+        _user_provider_row(
+            "custom:my-proxy",
+            [
+                "minimax-m3",
+                "minimax-m2.7",
+                "glm-5",
+                "deepseek-v4-flash",
+            ],
+        ),
+        _aggregator_row(
+            "opencode-go",
+            [
+                "kimi-k2.6",
+                "minimax-m3",
+                "minimax-m2.7",
+                "glm-5",
+                "deepseek-v4-flash",
+                "qwen3.7-max",
+            ],
+        ),
         _aggregator_row("openrouter", ["minimax-m3", "anthropic/claude-sonnet-4.6"]),
     ]
     ctx = _empty_ctx()
@@ -415,16 +532,18 @@ def test_flat_namespace_reseller_keeps_first_party_models_overlapping_user_proxy
 
     # The reseller keeps ALL of its first-party models — nothing stripped.
     assert go_row["models"] == [
-        "kimi-k2.6", "minimax-m3", "minimax-m2.7", "glm-5",
-        "deepseek-v4-flash", "qwen3.7-max",
+        "kimi-k2.6",
+        "minimax-m3",
+        "minimax-m2.7",
+        "glm-5",
+        "deepseek-v4-flash",
+        "qwen3.7-max",
     ]
     assert go_row["total_models"] == 6
 
     # A TRUE routing aggregator is still deduped against the user's models.
     assert "minimax-m3" not in or_row["models"]
     assert "anthropic/claude-sonnet-4.6" in or_row["models"]
-
-
 
 
 def test_build_models_payload_no_max_models_returns_full_list():
@@ -471,11 +590,15 @@ def test_build_models_payload_forwards_refresh_flag():
         captured["refresh"] = kwargs.get("refresh")
         return []
 
-    with patch("hermes_cli.model_switch.list_authenticated_providers", side_effect=_capture):
+    with patch(
+        "hermes_cli.model_switch.list_authenticated_providers", side_effect=_capture
+    ):
         build_models_payload(_empty_ctx())
     assert captured["refresh"] is False
 
-    with patch("hermes_cli.model_switch.list_authenticated_providers", side_effect=_capture):
+    with patch(
+        "hermes_cli.model_switch.list_authenticated_providers", side_effect=_capture
+    ):
         build_models_payload(_empty_ctx(), refresh=True)
     assert captured["refresh"] is True
 
@@ -509,7 +632,3 @@ def _apply_featured_with_dates(rows, dates: dict[str, str]):
 
     with patch("agent.models_dev.get_model_info", side_effect=_fake_get_model_info):
         inventory._apply_featured(rows)
-
-
-
-

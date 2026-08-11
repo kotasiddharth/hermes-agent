@@ -18,18 +18,20 @@ export const composerPanelGlass = cn('glass-composer-panel', 'transition-[backgr
 // surface, so retain the color transition but skip the per-frame blur work.
 export const composerSurfaceGlass = 'transition-[background-color] duration-150 ease-out'
 
-const composerDockEdge = (edge: 'bottom' | 'top') =>
+const composerDockEdge = (edge: 'bottom' | 'full' | 'top') =>
   cn(
     'border border-border/65',
     edge === 'top'
       ? 'rounded-t-[var(--composer-surface-radius)] border-b-0'
-      : 'rounded-b-[var(--composer-surface-radius)] border-t-0'
+      : edge === 'bottom'
+        ? 'rounded-b-[var(--composer-surface-radius)] border-t-0'
+        : 'rounded-[var(--composer-surface-radius)]'
   )
 
 /** Glassy docked card — the status stack / queue. Paints the SAME
  *  `--composer-fill` as the surface, so rest / scrolled / focused / drawer-open
  *  all match the composer by construction. */
-export const composerDockCard = (edge: 'bottom' | 'top' = 'top') =>
+export const composerDockCard = (edge: 'bottom' | 'full' | 'top' = 'top') =>
   cn(composerDockEdge(edge), composerFill, composerSurfaceGlass)
 
 /** Floating composer panel skin — the `/`·`@`·`?` completion drawer and the

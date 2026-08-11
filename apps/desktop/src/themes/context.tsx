@@ -234,6 +234,10 @@ function applyTheme(theme: DesktopTheme, mode: 'light' | 'dark') {
 
   window.hermesDesktop?.setTitleBarTheme?.({
     background: chromeBg,
+    // The app's top drag bar uses the sidebar surface. Send that exact opaque
+    // value to Windows/Linux rather than a transparent overlay, otherwise
+    // Windows can reveal its accent-coloured frame as a thin top-edge line.
+    titleBarBackground: c.sidebarBackground ?? c.background,
     foreground: c.foreground
   })
 

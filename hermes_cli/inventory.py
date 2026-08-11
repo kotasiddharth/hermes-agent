@@ -211,9 +211,7 @@ def build_models_payload(
         # has lost its credential, list_authenticated_providers() omits it;
         # keep that one row visible so the UI can show the saved selection and
         # a re-auth affordance instead of appearing to jump to another provider.
-        rows = list(rows) + _append_unconfigured_rows(
-            rows, ctx, current_only=True
-        )
+        rows = list(rows) + _append_unconfigured_rows(rows, ctx, current_only=True)
 
     # --- Deduplicate: remove models from aggregators that overlap with
     # user-defined providers.  When a local proxy (e.g. litellm-proxy)
@@ -261,7 +259,11 @@ def build_models_payload(
                     row["total_models"] = len(filtered)
 
     if include_unconfigured:
-        rows = list(rows) + [r for r in _append_unconfigured_rows(rows, ctx) if str(r.get("slug", "")).lower() != "moa"]
+        rows = list(rows) + [
+            r
+            for r in _append_unconfigured_rows(rows, ctx)
+            if str(r.get("slug", "")).lower() != "moa"
+        ]
     if picker_hints:
         _apply_picker_hints(rows)
     if canonical_order:
@@ -397,12 +399,16 @@ def format_aux_picker_entries(
             if slug.lower() == current_slug and current_slug and not has_base_url
             else ""
         )
-        entries.append((slug, f"{name}{model_hint}{marker}", list(row.get("models") or [])))
+        entries.append((
+            slug,
+            f"{name}{model_hint}{marker}",
+            list(row.get("models") or []),
+        ))
     return entries
 
 
 def _apply_capabilities(rows: list[dict]) -> None:
-    """Attach a ``{model: {fast, reasoning}}`` map to each provider row.
+    """Attach per-model option support, including exact reasoning levels.
 
     `fast` mirrors ``model_supports_fast_mode`` (the same gate the runtime
     enforces). `reasoning` comes from the models.dev catalog when known and
@@ -419,10 +425,11 @@ def _apply_capabilities(rows: list[dict]) -> None:
 
     for row in rows:
         slug = row.get("slug") or ""
-        caps: dict[str, dict[str, bool]] = {}
+        caps: dict[str, dict] = {}
 
         for model in row.get("models") or []:
             reasoning = True
+            meta = None
             if get_model_capabilities is not None and slug:
                 try:
                     meta = get_model_capabilities(slug, model)
@@ -431,10 +438,15 @@ def _apply_capabilities(rows: list[dict]) -> None:
                 except Exception:
                     reasoning = True
 
-            caps[model] = {
+            capability: dict[str, bool | list[str]] = {
                 "fast": bool(model_supports_fast_mode(model)),
                 "reasoning": reasoning,
             }
+            advertised_efforts = getattr(meta, "reasoning_efforts", None)
+            if advertised_efforts is not None:
+                capability["reasoning_efforts"] = list(advertised_efforts)
+
+            caps[model] = capability
 
         row["capabilities"] = caps
 
@@ -484,7 +496,9 @@ def _apply_featured(rows: list[dict]) -> None:
                 break
             date = ""
             if get_model_info is not None:
-                info = get_model_info(slug, model) or get_model_info("openrouter", model)
+                info = get_model_info(slug, model) or get_model_info(
+                    "openrouter", model
+                )
                 date = getattr(info, "release_date", "") if info else ""
             by_lab.setdefault(lab, []).append((pos, date, model))
 
@@ -536,11 +550,7 @@ def _append_unconfigured_rows(
         if entry.slug.lower() == cur:
             cfg = PROVIDER_REGISTRY.get(entry.slug)
             auth_type = cfg.auth_type if cfg else "api_key"
-            key_env = (
-                cfg.api_key_env_vars[0]
-                if (cfg and cfg.api_key_env_vars)
-                else ""
-            )
+            key_env = cfg.api_key_env_vars[0] if (cfg and cfg.api_key_env_vars) else ""
             warning = (
                 f"Configured provider missing usable credentials; paste {key_env} to reactivate. "
                 "Showing the saved model only."
@@ -548,33 +558,29 @@ def _append_unconfigured_rows(
                 else "Configured provider is not authenticated; run `hermes model` to reactivate. "
                 "Showing the saved model only."
             )
-            extras.append(
-                {
-                    "slug": entry.slug,
-                    "name": _PROVIDER_LABELS.get(entry.slug, entry.label),
-                    "is_current": True,
-                    "is_user_defined": False,
-                    "models": [cur_model] if cur_model else [],
-                    "total_models": 1 if cur_model else 0,
-                    "source": "configured-current",
-                    "authenticated": False,
-                    "auth_type": auth_type,
-                    "key_env": key_env,
-                    "warning": warning,
-                }
-            )
-            continue
-        extras.append(
-            {
+            extras.append({
                 "slug": entry.slug,
                 "name": _PROVIDER_LABELS.get(entry.slug, entry.label),
-                "is_current": entry.slug.lower() == cur,
+                "is_current": True,
                 "is_user_defined": False,
-                "models": [],
-                "total_models": 0,
-                "source": "canonical",
-            }
-        )
+                "models": [cur_model] if cur_model else [],
+                "total_models": 1 if cur_model else 0,
+                "source": "configured-current",
+                "authenticated": False,
+                "auth_type": auth_type,
+                "key_env": key_env,
+                "warning": warning,
+            })
+            continue
+        extras.append({
+            "slug": entry.slug,
+            "name": _PROVIDER_LABELS.get(entry.slug, entry.label),
+            "is_current": entry.slug.lower() == cur,
+            "is_user_defined": False,
+            "models": [],
+            "total_models": 0,
+            "source": "canonical",
+        })
     return extras
 
 
@@ -681,11 +687,7 @@ def _apply_picker_hints(rows: list[dict]) -> None:
             continue
         cfg = PROVIDER_REGISTRY.get(row["slug"])
         auth_type = cfg.auth_type if cfg else "api_key"
-        key_env = (
-            cfg.api_key_env_vars[0]
-            if (cfg and cfg.api_key_env_vars)
-            else ""
-        )
+        key_env = cfg.api_key_env_vars[0] if (cfg and cfg.api_key_env_vars) else ""
         row["auth_type"] = auth_type
         row["key_env"] = key_env
         row["warning"] = (
@@ -785,20 +787,14 @@ def _apply_pricing(
             # pricing.original somehow appeared in their catalog. Free / $0
             # models never get sale chrome either — even if original leaked.
             if slug == "nous" and not is_free:
-                sale = compute_sale_discount(
-                    inp_raw, out_raw, p.get("original")
-                )
+                sale = compute_sale_discount(inp_raw, out_raw, p.get("original"))
                 if sale is not None:
                     discount_percent, was_prompt_raw, was_out_raw = sale
                     entry["discount_percent"] = discount_percent
                     if was_prompt_raw != "":
-                        entry["was_input"] = _format_price_per_mtok(
-                            was_prompt_raw
-                        )
+                        entry["was_input"] = _format_price_per_mtok(was_prompt_raw)
                     if was_out_raw != "":
-                        entry["was_output"] = _format_price_per_mtok(
-                            was_out_raw
-                        )
+                        entry["was_output"] = _format_price_per_mtok(was_out_raw)
             formatted[mid] = entry
 
         if formatted:

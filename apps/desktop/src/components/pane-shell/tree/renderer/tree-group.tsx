@@ -215,6 +215,12 @@ export function TreeGroup({
   // begins; rounding the navigation rail instead makes that boundary look
   // backwards (and leaves its right edge floating in the window).
   const isSessionsRail = activeId === 'sessions'
+  // Chat navigation lives in the sidebar and the app-level history controls.
+  // Keeping a second, always-visible row of session tabs above the composer
+  // duplicates that navigation and makes a stack of fresh chats look like a
+  // browser tab bar. Keep the shared strip for tool/page panes, but remove it
+  // entirely for zones that host the workspace or session tiles.
+  const hideSessionTabStrip = shown.some(isSessionStripPane)
   // The workspace is the app's anchored primary surface. Give only its
   // upper-left edge the same explicit curve as the Codex workspace, so the
   // sidebar-to-content transition reads as a pane boundary instead of a
@@ -269,7 +275,9 @@ export function TreeGroup({
   // (tabs reading top-to-bottom). In a column (stacked zones) the horizontal
   // header IS the collapsed form, exactly as before.
   const verticalCollapse = Boolean(node.minimized) && parentAxis === 'row' && !isEmpty
-  const headerVisible = !isEmpty && !verticalCollapse && (Boolean(node.minimized) || !headerHidden)
+
+  const headerVisible =
+    !hideSessionTabStrip && !isEmpty && !verticalCollapse && (Boolean(node.minimized) || !headerHidden)
 
   // Keep the activated tab — and, on the last one, the trailing "+" — inside
   // the strip's scroll window. Opening a tab past the right edge otherwise

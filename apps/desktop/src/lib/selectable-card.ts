@@ -21,7 +21,7 @@ export interface SelectableCardState {
  */
 export function selectableCardClass({ active, prominent }: SelectableCardState): string {
   return cn(
-    'rounded-[var(--radius-md)] border transition-[background-color,border-color,box-shadow,color,transform] duration-200 ease-[cubic-bezier(0.2,0.8,0.2,1)] hover:-translate-y-px',
+    'rounded-[var(--radius-md)] border transition-[background-color,border-color,box-shadow,color] duration-200 ease-[cubic-bezier(0.2,0.8,0.2,1)]',
     active
       ? 'border-primary bg-primary/[0.06] text-foreground shadow-sm ring-2 ring-primary/20'
       : prominent

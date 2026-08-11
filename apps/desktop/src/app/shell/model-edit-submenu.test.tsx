@@ -31,6 +31,7 @@ function renderSubmenu(opts: {
   onSelectModel?: (model: string) => void
   onSetOptions: (patch: { effort?: string; fast?: boolean }) => void
   reasoning: boolean
+  reasoningEfforts?: string[]
 }) {
   return render(
     <DropdownMenu open>
@@ -47,6 +48,7 @@ function renderSubmenu(opts: {
             onSetOptions={opts.onSetOptions}
             provider="p1"
             reasoning={opts.reasoning}
+            reasoningEfforts={opts.reasoningEfforts}
           />
         </DropdownMenuSub>
       </DropdownMenuContent>
@@ -92,6 +94,53 @@ describe('ModelEditSubmenu reports edits without performing them', () => {
     fireEvent.click(screen.getByRole('switch'))
 
     expect(onSetOptions).toHaveBeenCalledWith({ effort: 'high' })
+  })
+
+  it('shows only the model-advertised effort levels and clamps the active selection', () => {
+    const onSetOptions = vi.fn()
+    renderSubmenu({
+      effort: 'max',
+      fastControl: { kind: 'none' },
+      onSetOptions,
+      reasoning: true,
+      reasoningEfforts: ['low', 'medium', 'high']
+    })
+
+    expect(screen.getByRole('menuitemradio', { name: 'Low' })).toBeTruthy()
+    expect(screen.getByRole('menuitemradio', { name: 'Medium' })).toBeTruthy()
+    expect(screen.getByRole('menuitemradio', { name: 'High' }).getAttribute('data-state')).toBe('checked')
+    expect(screen.queryByRole('menuitemradio', { name: 'Max' })).toBeNull()
+    expect(screen.queryByRole('menuitemradio', { name: 'Ultra' })).toBeNull()
+  })
+
+  it('marks only the model-advertised effort ceiling as purple', () => {
+    const onSetOptions = vi.fn()
+    renderSubmenu({
+      fastControl: { kind: 'none' },
+      onSetOptions,
+      reasoning: true,
+      reasoningEfforts: ['low', 'medium', 'high']
+    })
+
+    const high = screen.getByRole('menuitemradio', { name: 'High' })
+
+    expect(high.getAttribute('data-highest-effort')).toBe('')
+    expect(high.className).toContain('text-violet-600')
+    expect(screen.getByRole('menuitemradio', { name: 'Low' }).getAttribute('data-highest-effort')).toBeNull()
+    expect(screen.getByRole('menuitemradio', { name: 'Medium' }).getAttribute('data-highest-effort')).toBeNull()
+  })
+
+  it('keeps the thinking toggle but removes the fake effort ladder for toggle-only models', () => {
+    const onSetOptions = vi.fn()
+    renderSubmenu({
+      fastControl: { kind: 'none' },
+      onSetOptions,
+      reasoning: true,
+      reasoningEfforts: []
+    })
+
+    expect(screen.getByRole('switch')).toBeTruthy()
+    expect(screen.queryByRole('menuitemradio')).toBeNull()
   })
 
   it('variant fast: swaps the model only when the row is active', () => {

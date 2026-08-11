@@ -105,7 +105,7 @@ export const OverlayNavItem = memo(function OverlayNavItem({
   return (
     <button
       className={cn(
-        'flex h-8 w-full items-center justify-start gap-2.5 rounded-[var(--radius-sm)] border px-2.5 text-left text-[0.8125rem] font-medium transition-[transform,background-color,border-color,color] duration-200 ease-out hover:translate-x-px active:translate-x-0',
+        'flex h-8 w-full items-center justify-start gap-2.5 rounded-[var(--radius-sm)] border px-2.5 text-left text-[0.8125rem] font-medium transition-[background-color,border-color,color] duration-200 ease-out',
         nested
           ? active
             ? 'border-transparent bg-(--chrome-action-hover) text-foreground'

@@ -25,7 +25,13 @@ import type {
 } from '@/hermes'
 import { useI18n } from '@/i18n'
 import { AlertTriangle, Cpu, Loader2 } from '@/lib/icons'
-import { DEFAULT_REASONING_EFFORT, REASONING_EFFORT_VALUES } from '@/lib/reasoning-effort'
+import {
+  DEFAULT_REASONING_EFFORT,
+  highestAdvertisedReasoningEffort,
+  type ReasoningEffort,
+  resolveSupportedReasoningEffort,
+  supportedReasoningEfforts
+} from '@/lib/reasoning-effort'
 import { cn } from '@/lib/utils'
 import { notifyError } from '@/store/notifications'
 import { startManualLocalEndpoint, startManualOnboarding, startManualProviderOAuth } from '@/store/onboarding'
@@ -502,6 +508,16 @@ export function ModelSettings({ onMainModelChanged }: ModelSettingsProps) {
 
   const reasoningSupported = mainCaps?.reasoning ?? true
   const fastSupported = mainCaps?.fast ?? false
+  const selectableReasoningEfforts = supportedReasoningEfforts(mainCaps?.reasoning_efforts)
+
+  const hasSelectableReasoningEfforts =
+    mainCaps?.reasoning_efforts === undefined || selectableReasoningEfforts.length > 0
+
+  const highestReasoningEffort = highestAdvertisedReasoningEffort(mainCaps?.reasoning_efforts)
+
+  const reasoningEffortOptions: Array<'none' | ReasoningEffort> = hasSelectableReasoningEfforts
+    ? ['none', ...selectableReasoningEfforts]
+    : []
 
   // Hand-written `reasoning_effort: false`/`off` reaches us as boolean false
   // ("false" once stringified) — show it as Off, not an empty select.
@@ -509,7 +525,20 @@ export function ModelSettings({ onMainModelChanged }: ModelSettingsProps) {
     .trim()
     .toLowerCase()
 
-  const effortValue = rawEffort === 'false' || rawEffort === 'disabled' ? 'none' : rawEffort || DEFAULT_REASONING_EFFORT
+  const configuredEffort =
+    rawEffort === 'false' || rawEffort === 'disabled' ? 'none' : rawEffort || DEFAULT_REASONING_EFFORT
+
+  const effortValue = resolveSupportedReasoningEffort(
+    configuredEffort,
+    DEFAULT_REASONING_EFFORT,
+    mainCaps?.reasoning_efforts
+  )
+
+  const enabledEffort = resolveSupportedReasoningEffort(
+    DEFAULT_REASONING_EFFORT,
+    DEFAULT_REASONING_EFFORT,
+    mainCaps?.reasoning_efforts
+  )
 
   const fastOn = isFastTier(getNested(config ?? {}, 'agent.service_tier'))
 
@@ -839,21 +868,39 @@ export function ModelSettings({ onMainModelChanged }: ModelSettingsProps) {
             {reasoningSupported && (
               <div className="flex items-center gap-2 text-xs">
                 {m.reasoning}
-                <Select
-                  onValueChange={value => void writeAgentDefault('agent.reasoning_effort', value)}
-                  value={effortValue}
-                >
-                  <SelectTrigger className={cn('min-w-28', CONTROL_TEXT)}>
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {REASONING_EFFORT_VALUES.map(value => (
-                      <SelectItem key={value} value={value}>
-                        {value === 'none' ? m.reasoningOff : t.shell.modelOptions[value]}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
+                {hasSelectableReasoningEfforts ? (
+                  <Select
+                    onValueChange={value => void writeAgentDefault('agent.reasoning_effort', value)}
+                    value={effortValue}
+                  >
+                    <SelectTrigger className={cn('min-w-28', CONTROL_TEXT)}>
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {reasoningEffortOptions.map(value => (
+                        <SelectItem
+                          className={cn(
+                            value === highestReasoningEffort &&
+                              'font-medium text-violet-600 focus:text-violet-600 dark:text-violet-400 dark:focus:text-violet-400'
+                          )}
+                          data-highest-effort={value === highestReasoningEffort ? '' : undefined}
+                          key={value}
+                          value={value}
+                        >
+                          {value === 'none' ? m.reasoningOff : t.shell.modelOptions[value]}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                ) : (
+                  <Switch
+                    checked={effortValue !== 'none'}
+                    onCheckedChange={checked =>
+                      void writeAgentDefault('agent.reasoning_effort', checked ? enabledEffort : 'none')
+                    }
+                    size="xs"
+                  />
+                )}
               </div>
             )}
             {fastSupported && (

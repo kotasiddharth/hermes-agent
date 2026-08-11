@@ -73,6 +73,7 @@ import {
   exitProjectScope,
   fetchProjectSessions,
   openProjectCreate,
+  projectCwdForId,
   refreshProjects,
   refreshProjectTree,
   refreshWorktrees
@@ -103,6 +104,7 @@ import {
 } from '../../routes'
 import type { SidebarNavItem } from '../../types'
 
+import { SidebarAccountMenu } from './account-menu'
 import { SidebarCronJobsSection } from './cron-jobs-section'
 import { SidebarLoadMoreRow } from './load-more-row'
 import { orderByIds, reconcileOrderIds, resolveManualSessionOrderIds, sameIds } from './order'
@@ -116,7 +118,6 @@ import {
   PROJECT_PREVIEW_COUNT,
   ProjectBackRow,
   ProjectMenu,
-  projectTreeCwd,
   sessionRecency as sessionTime,
   type SidebarProjectTree,
   type SidebarSessionGroup,
@@ -128,7 +129,7 @@ import {
 import { WorktreeDialog } from './projects/worktree-dialog'
 import { SidebarBlankState, SidebarSessionSkeletons } from './section-states'
 import { buildSessionByAnyId } from './session-index'
-import { SidebarSessionsSection, VIRTUALIZE_THRESHOLD } from './sessions-section'
+import { SidebarSessionsSection } from './sessions-section'
 import { CONTEXT_SPLIT_KIT, SplitSubmenu } from './split-submenu'
 
 // Non-session groups (messaging platforms) stay compact: show a few rows up
@@ -309,6 +310,7 @@ export function ChatSidebar({
   const [messagingVisible, setMessagingVisible] = useState<Record<string, number>>({})
 
   const lastPassiveProjectRefreshAtRef = useRef(0)
+
   const refreshPassiveProjectData = useCallback(() => {
     const now = Date.now()
 
@@ -674,8 +676,8 @@ export function ChatSidebar({
   const lastProjectCwdSyncRef = useRef<null | string>(null)
 
   const syncProjectCwd = useCallback(
-    (project: SidebarProjectTree) => {
-      const target = projectTreeCwd(project)
+    (projectId: string) => {
+      const target = projectCwdForId(projectId)
 
       if (target && target !== currentCwd) {
         setCurrentCwd(target)
@@ -696,7 +698,7 @@ export function ChatSidebar({
       return
     }
 
-    syncProjectCwd(enteredProject)
+    syncProjectCwd(enteredProject.id)
     lastProjectCwdSyncRef.current = enteredProject.id
   }, [inProject, enteredProject, syncProjectCwd])
 
@@ -731,15 +733,11 @@ export function ChatSidebar({
 
   const onEnterProject = useCallback(
     (id: string) => {
-      const project = projectModel.find(node => node.id === id)
-
-      if (project) {
-        syncProjectCwd(project)
-      }
+      syncProjectCwd(id)
 
       enterProject(id)
     },
-    [projectModel, syncProjectCwd]
+    [syncProjectCwd]
   )
 
   const projectSectionLabel = inProject && enteredProject ? enteredProject.label : s.projects.sectionLabel
@@ -967,15 +965,11 @@ export function ChatSidebar({
 
   const displayAgentGroups = showAllProfiles ? profileGroups : undefined
 
-  // The Recents list owns its own virtualized scroll container only when it is
-  // long. Short flat lists and profile groups flatten into the outer scroll.
   // The visible project tree remains the source for repo/worktree ordering.
   const activeRepoTrees = useMemo<SidebarWorkspaceTree[]>(
     () => (visibleProjectTree ? visibleProjectTree.flatMap(project => project.repos) : []),
     [visibleProjectTree]
   )
-
-  const recentsVirtualizes = !displayAgentGroups?.length && displayAgentSessions.length >= VIRTUALIZE_THRESHOLD
 
   // Keep the persisted parent + worktree orders reconciled with what's on screen:
   // freshly-seen repos/worktrees surface at the top, vanished ones drop out of
@@ -1256,10 +1250,7 @@ export function ChatSidebar({
                 SCROLL_Y,
                 // Separate profile sections clearly in the ALL view; rows inside
                 // each group keep their own tight gap-px rhythm.
-                showAllProfiles ? 'gap-3' : 'gap-px',
-                // Flatten into the single scroll when compact — unless this is the
-                // virtualized long list, which must keep its own scroller.
-                !recentsVirtualizes && COMPACT_FLAT
+                showAllProfiles ? 'gap-3' : 'gap-px'
               )}
               dndSensors={dndSensors}
               emptyState={
@@ -1299,8 +1290,10 @@ export function ChatSidebar({
               open={agentsOpen}
               pinned={false}
               rootClassName={cn(
-                'min-h-32 flex-1 overflow-hidden p-0',
-                !recentsVirtualizes && 'compact:min-h-0 compact:flex-none compact:overflow-visible'
+                // Recents owns the remaining height, including in compact
+                // windows. Flattening it into the outer scroll left a partial
+                // row clipped at the bottom of the sidebar.
+                'min-h-0 flex-1 overflow-hidden p-0'
               )}
               sessions={displayAgentSessions}
               sortable={!showAllProfiles && displayAgentSessions.length > 1}
@@ -1367,6 +1360,7 @@ export function ChatSidebar({
 
         {!showSessionSections && <SidebarBlankState onNewProject={openProjectCreate} />}
       </SidebarContent>
+      <SidebarAccountMenu />
       <ProjectDialog />
       {/* One mount for the whole app. The header of WorktreeDialog tells why. */}
       <WorktreeDialog />

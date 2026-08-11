@@ -497,7 +497,10 @@ export function useSessionActions({
         // Fresh tile → the caller's workspace when one was named (the sidebar
         // "+" on a project/worktree lane), else the resolved new-session cwd
         // (focused session's project → project scope → default).
-        const params = await desktopSessionCreateParams((options?.cwd || resolveNewSessionCwd()).trim())
+        // `null` is an intentional detached workspace; only an omitted cwd
+        // should inherit the active project's shared folder.
+        const cwd = options?.cwd === undefined ? resolveNewSessionCwd() : (options.cwd ?? '')
+        const params = await desktopSessionCreateParams(cwd.trim())
         const created = await requestGateway<SessionCreateResponse>('session.create', params)
         const stored = created.stored_session_id
 

@@ -8,6 +8,7 @@ import { $currentCwd, $selectedStoredSessionId, $sessions, applyConfiguredDefaul
 
 import {
   $activeProjectId,
+  $projects,
   $projectScope,
   $projectSessionOwners,
   $projectsRpcAvailable,
@@ -23,6 +24,7 @@ import {
   exitProjectScope,
   openProjectCreate,
   pickProjectFolder,
+  projectIdForCwd,
   projectNameForCwd,
   refreshProjects,
   refreshProjectTree,
@@ -116,6 +118,8 @@ describe('project scope', () => {
 describe('resolveNewSessionCwd', () => {
   beforeEach(() => {
     $projectScope.set(ALL_PROJECTS)
+    $projects.set([])
+    $projectTree.set([])
     applyConfiguredDefaultProjectDir('/home/user/configured')
     $currentCwd.set('')
     $selectedStoredSessionId.set(null)
@@ -128,6 +132,8 @@ describe('resolveNewSessionCwd', () => {
   afterEach(() => {
     applyConfiguredDefaultProjectDir(null)
     $projectScope.set(ALL_PROJECTS)
+    $projects.set([])
+    $projectTree.set([])
     $currentCwd.set('')
     $selectedStoredSessionId.set(null)
     $sessions.set([])
@@ -143,6 +149,47 @@ describe('resolveNewSessionCwd', () => {
 
   it('still falls back to the configured default outside Home', () => {
     expect(resolveNewSessionCwd()).toBe('/home/user/configured')
+  })
+
+  it('keeps every new chat in an entered project folder before the sidebar tree loads', () => {
+    // The project list and the lazy sidebar tree are fetched separately. Opening
+    // a project must be enough to establish its shared folder immediately — a
+    // Ctrl+N/Ctrl+T in this gap must never inherit another chat's cwd.
+    $projects.set([
+      {
+        archived: false,
+        board_slug: null,
+        color: null,
+        created_at: 0,
+        description: null,
+        folders: [{ added_at: 0, is_primary: true, label: null, path: '/Users/me/Projects/atlas' }],
+        icon: null,
+        id: 'p_atlas',
+        name: 'Atlas',
+        primary_path: '/Users/me/Projects/atlas',
+        slug: 'atlas'
+      }
+    ])
+    $selectedStoredSessionId.set('other-project-chat')
+    $sessions.set([
+      {
+        archived: false,
+        cwd: '/Users/me/Projects/other',
+        ended_at: null,
+        id: 'other-project-chat',
+        input_tokens: 0,
+        is_active: true,
+        last_active: 0,
+        message_count: 1,
+        model: null,
+        output_tokens: 0,
+        started_at: 0,
+        title: 'other'
+      } as never
+    ])
+    enterProject('p_atlas')
+
+    expect(resolveNewSessionCwd()).toBe('/Users/me/Projects/atlas')
   })
 
   it('inherits the focused session workspace when not drilled into a project', () => {
@@ -168,6 +215,82 @@ describe('resolveNewSessionCwd', () => {
     ])
 
     expect(resolveNewSessionCwd()).toBe('/Users/me/www/hermes-agent')
+  })
+
+  it('returns to the project root when the focused chat is in a linked worktree', () => {
+    $projectTree.set([
+      {
+        id: 'p_atlas',
+        label: 'Atlas',
+        path: '/Users/me/Projects/atlas',
+        repos: [
+          {
+            groups: [{ branch: 'feature/context', path: '/Users/me/Projects/atlas-context', sessions: [] }],
+            id: '/Users/me/Projects/atlas',
+            label: 'atlas',
+            path: '/Users/me/Projects/atlas',
+            sessionCount: 0
+          }
+        ],
+        sessionCount: 0
+      } as never
+    ])
+    $selectedStoredSessionId.set('worktree-chat')
+    $sessions.set([
+      {
+        archived: false,
+        cwd: '/Users/me/Projects/atlas-context',
+        ended_at: null,
+        id: 'worktree-chat',
+        input_tokens: 0,
+        is_active: true,
+        last_active: 0,
+        message_count: 1,
+        model: null,
+        output_tokens: 0,
+        started_at: 0,
+        title: 'worktree'
+      } as never
+    ])
+
+    expect(resolveNewSessionCwd()).toBe('/Users/me/Projects/atlas')
+  })
+
+  it('uses saved project folders to normalize a focused nested chat before the tree loads', () => {
+    $projects.set([
+      {
+        archived: false,
+        board_slug: null,
+        color: null,
+        created_at: 0,
+        description: null,
+        folders: [{ added_at: 0, is_primary: true, label: null, path: '/Users/me/Projects/atlas' }],
+        icon: null,
+        id: 'p_atlas',
+        name: 'Atlas',
+        primary_path: '/Users/me/Projects/atlas',
+        slug: 'atlas'
+      }
+    ])
+    $selectedStoredSessionId.set('nested-chat')
+    $sessions.set([
+      {
+        archived: false,
+        cwd: '/Users/me/Projects/atlas/src',
+        ended_at: null,
+        id: 'nested-chat',
+        input_tokens: 0,
+        is_active: true,
+        last_active: 0,
+        message_count: 1,
+        model: null,
+        output_tokens: 0,
+        started_at: 0,
+        title: 'nested'
+      } as never
+    ])
+
+    expect(resolveNewSessionCwd()).toBe('/Users/me/Projects/atlas')
   })
 
   it('does not re-attach a remembered cwd when the focused session is detached', () => {
@@ -255,6 +378,39 @@ describe('projectNameForCwd', () => {
 
     expect(projectNameForCwd('/somewhere/else')).toBeNull()
     expect(projectNameForCwd('')).toBeNull()
+  })
+})
+
+describe('projectIdForCwd', () => {
+  beforeEach(() => {
+    $projects.set([])
+    $projectTree.set([])
+  })
+
+  afterEach(() => {
+    $projects.set([])
+    $projectTree.set([])
+  })
+
+  it('uses directory boundaries and normalizes Windows project paths', () => {
+    $projects.set([
+      {
+        archived: false,
+        board_slug: null,
+        color: null,
+        created_at: 0,
+        description: null,
+        folders: [{ added_at: 0, is_primary: true, label: null, path: 'C:\\Projects\\Atlas' }],
+        icon: null,
+        id: 'p_atlas',
+        name: 'Atlas',
+        primary_path: 'C:\\Projects\\Atlas',
+        slug: 'atlas'
+      }
+    ])
+
+    expect(projectIdForCwd('c:/projects/atlas/src')).toBe('p_atlas')
+    expect(projectIdForCwd('C:\\Projects\\atlas-old')).toBeNull()
   })
 })
 

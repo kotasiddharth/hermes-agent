@@ -6,17 +6,21 @@ import { $notifications, clearNotifications } from '@/store/notifications'
 
 vi.mock('@/store/coding-status', () => ({
   registerRepoStatusCwd: () => undefined,
-  repoStatusForCwd: () =>
-    atom({
-      added: 12,
-      ahead: 0,
-      behind: 0,
-      branch: 'bb/hitbox',
-      defaultBranch: 'main',
-      detached: false,
-      removed: 3,
-      untracked: 0
-    }),
+  repoStatusForCwd: (cwd?: string) =>
+    atom(
+      cwd === '/folder'
+        ? null
+        : {
+            added: 12,
+            ahead: 0,
+            behind: 0,
+            branch: 'bb/hitbox',
+            defaultBranch: 'main',
+            detached: false,
+            removed: 3,
+            untracked: 0
+          }
+    ),
   repoWorktreesForCwd: () => atom([])
 }))
 
@@ -46,28 +50,40 @@ describe('CodingStatusRow', () => {
     expect(onOpen).toHaveBeenCalledTimes(2)
   })
 
-  it('wraps the click targets without adding a layout box', () => {
+  it('uses an independently rounded card above the composer', () => {
     const { container } = render(<CodingStatusRow onOpen={() => undefined} repoPath="/repo" />)
 
-    // `display: contents` is what keeps the branch label and the counts direct
-    // flex children of the row — the hit areas cost nothing visually.
-    expect(screen.getByText('bb/hitbox').parentElement?.classList.contains('contents')).toBe(true)
-    expect(screen.getByText('12').closest('button')?.classList.contains('contents')).toBe(true)
-    // The glyph button fills the row's existing 3.5 leading slot exactly.
-    expect(container.querySelector('button[class~="size-3.5"]')).not.toBeNull()
+    const bar = container.querySelector<HTMLElement>('.coding-status-bar')
+    const card = container.querySelector<HTMLElement>('[data-slot="coding-status-card"]')
+
+    expect(card?.classList.contains('mb-1.5')).toBe(true)
+    expect(card?.classList.contains('rounded-[var(--composer-surface-radius)]')).toBe(true)
+    expect(bar?.classList.contains('border-b')).toBe(false)
   })
 
-  it('parks the copy glyph against the end of the path, not the end of the row', () => {
+  it('renders the directory, connection, and branch as one workspace breadcrumb', () => {
+    render(<CodingStatusRow onOpen={() => undefined} repoPath="/repo" />)
+
+    expect(screen.getByText('repo')).toBeTruthy()
+    expect(screen.getByText('Local')).toBeTruthy()
+    expect(screen.getByText('bb/hitbox').closest('button')).toBeTruthy()
+    expect(screen.getByText('12').closest('button')?.classList.contains('contents')).toBe(true)
+  })
+
+  it('keeps the directory breadcrumb visible for a non-Git project folder', () => {
+    render(<CodingStatusRow onOpen={() => undefined} repoPath="/folder" />)
+
+    expect(screen.getByText('folder')).toBeTruthy()
+    expect(screen.getByText('Local')).toBeTruthy()
+    expect(screen.queryByText('bb/hitbox')).toBeNull()
+  })
+
+  it('keeps the copy affordance next to the folder name', () => {
     render(<CodingStatusRow onOpen={() => undefined} repoPath="/Users/someone/www/repo" />)
 
-    const path = screen.getByText('~/www/repo')
+    const path = screen.getByText('repo')
 
-    // The path sizes to its content and the glyph is its immediate sibling, so
-    // the pair reads as one unit. `flex-1` belongs to the wrapper (which holds
-    // the row's slack open) — on the label it stretched the text and pushed the
-    // glyph out to the kebab.
-    expect(path.classList.contains('flex-1')).toBe(false)
-    expect(path.parentElement?.classList.contains('flex-1')).toBe(true)
+    expect(path.parentElement?.classList.contains('group/workspace')).toBe(true)
     expect(path.nextElementSibling?.tagName).toBe('BUTTON')
   })
 
@@ -78,8 +94,8 @@ describe('CodingStatusRow', () => {
 
     render(<CodingStatusRow onOpen={() => undefined} repoPath="/Users/someone/www/repo" />)
 
-    // Painted tildified, copied raw.
-    expect(screen.getByText('~/www/repo')).toBeTruthy()
+    // Painted as a folder name, copied as the raw absolute directory.
+    expect(screen.getByText('repo')).toBeTruthy()
 
     const copy = screen.getByRole('button', { name: 'Copy Path' })
 

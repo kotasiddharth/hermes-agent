@@ -130,14 +130,18 @@ export const ResponseLoadingIndicator: FC = () => {
   const hint = useStatusHint(compacting, drafting)
 
   return (
-    <StatusRow data-slot="aui_response-loading" label={hint || t.assistant.thread.loadingResponse}>
+    <StatusRow
+      className="mb-3 border-b border-(--ui-stroke-tertiary) pb-2"
+      data-slot="aui_response-loading"
+      label={hint || t.assistant.thread.loadingResponse}
+    >
       <StatusPulse
         aria-hidden="true"
         className="dither inline-block size-3 rounded-[2px] text-midground/80"
         kind="opacity"
       />
-      {hint && <HintText>{hint}</HintText>}
-      <ActivityTimerText seconds={elapsed} />
+      <HintText>{hint || t.assistant.thread.loadingResponse}</HintText>
+      <ActivityTimerText className="text-[0.6875rem] text-(--conversation-scaffold-text)" seconds={elapsed} />
     </StatusRow>
   )
 }

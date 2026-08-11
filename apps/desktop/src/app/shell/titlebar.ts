@@ -7,6 +7,11 @@ export const TITLEBAR_CONTROL_OFFSET_X = 74
 export const TITLEBAR_CONTROL_HEIGHT = 22
 export const TITLEBAR_CONTROLS_TOP = (TITLEBAR_HEIGHT - TITLEBAR_CONTROL_HEIGHT) / 2
 export const TITLEBAR_FALLBACK_WINDOW_BUTTON_X = 24
+// The leading cluster is the sidebar toggle plus browser-style back/forward
+// navigation. Windows and Linux add the compact File/Edit/View/Help bar after
+// it; this width reserves a safe drag-free lane for those text triggers.
+export const TITLEBAR_LEADING_CONTROL_COUNT = 3
+export const TITLEBAR_MENU_BAR_WIDTH = '10.5rem'
 // Edge inset used when no left-side native controls take up that space —
 // Windows/Linux (native overlay is on the right) and macOS fullscreen
 // (traffic lights are hidden). Matches the right-cluster's 0.75rem padding.

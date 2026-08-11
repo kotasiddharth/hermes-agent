@@ -53,6 +53,7 @@ _models_dev_refresh_in_flight = False
 # Dataclasses — rich metadata for providers and models
 # ---------------------------------------------------------------------------
 
+
 @dataclass
 class ModelInfo:
     """Full metadata for a single model from models.dev."""
@@ -60,18 +61,18 @@ class ModelInfo:
     id: str
     name: str
     family: str
-    provider_id: str        # models.dev provider ID (e.g. "anthropic")
+    provider_id: str  # models.dev provider ID (e.g. "anthropic")
 
     # Capabilities
     reasoning: bool = False
     tool_call: bool = False
-    attachment: bool = False       # supports image/file attachments (vision)
+    attachment: bool = False  # supports image/file attachments (vision)
     temperature: bool = False
     structured_output: bool = False
     open_weights: bool = False
 
     # Modalities
-    input_modalities: Tuple[str, ...] = ()    # ("text", "image", "pdf", ...)
+    input_modalities: Tuple[str, ...] = ()  # ("text", "image", "pdf", ...)
     output_modalities: Tuple[str, ...] = ()
 
     # Limits
@@ -88,7 +89,7 @@ class ModelInfo:
     # Metadata
     knowledge_cutoff: str = ""
     release_date: str = ""
-    status: str = ""          # "alpha", "beta", "deprecated", or ""
+    status: str = ""  # "alpha", "beta", "deprecated", or ""
     interleaved: Any = False  # True or {"field": "reasoning_content"}
 
     def has_cost_data(self) -> bool:
@@ -136,11 +137,11 @@ class ModelInfo:
 class ProviderInfo:
     """Full metadata for a provider from models.dev."""
 
-    id: str                         # models.dev provider ID
-    name: str                       # display name
-    env: Tuple[str, ...]            # env var names for API key
-    api: str                        # base URL
-    doc: str = ""                   # documentation URL
+    id: str  # models.dev provider ID
+    name: str  # display name
+    env: Tuple[str, ...]  # env var names for API key
+    api: str  # base URL
+    doc: str = ""  # documentation URL
     model_count: int = 0
 
 
@@ -181,6 +182,9 @@ PROVIDER_TO_MODELS_DEV: Dict[str, str] = {
     # catalog, so model metadata should resolve through the xAI provider.
     "xai-oauth": "xai",
     "xiaomi": "xiaomi",
+    "tencent-tokenhub": "tencent-tokenhub",
+    "tencent": "tencent-tokenhub",
+    "tokenhub": "tencent-tokenhub",
     "nvidia": "nvidia",
     "groq": "groq",
     "mistral": "mistral",
@@ -194,10 +198,10 @@ PROVIDER_TO_MODELS_DEV: Dict[str, str] = {
 _MODELS_DEV_TO_PROVIDER: Optional[Dict[str, str]] = None
 
 
-
 def _get_cache_path() -> Path:
     """Return path to disk cache file."""
     from hermes_constants import get_hermes_home
+
     return get_hermes_home() / "models_dev_cache.json"
 
 
@@ -414,9 +418,7 @@ def fetch_models_dev(
     if not force_refresh and _models_dev_cache:
         _mark_stale_cache_grace()
         _start_background_refresh_models_dev()
-        logger.debug(
-            "Using stale in-memory models.dev cache; refreshing in background"
-        )
+        logger.debug("Using stale in-memory models.dev cache; refreshing in background")
         return _models_dev_cache
 
     # Stage 3: disk cache short-circuits the network call.
@@ -436,7 +438,9 @@ def fetch_models_dev(
                     _models_dev_cache_time = time.time() - disk_age
                     logger.debug(
                         "Loaded models.dev from fresh disk cache "
-                        "(%d providers, age=%.0fs)", len(disk_data), disk_age,
+                        "(%d providers, age=%.0fs)",
+                        len(disk_data),
+                        disk_age,
                     )
                 else:
                     _mark_stale_cache_grace()
@@ -574,6 +578,10 @@ class ModelCapabilities:
     supports_tools: bool = True
     supports_vision: bool = False
     supports_reasoning: bool = False
+    # ``None`` means models.dev did not report the model's named effort values.
+    # ``()`` means it explicitly offers native reasoning but only as a toggle
+    # or token-budget control, not a discrete effort menu.
+    reasoning_efforts: Optional[Tuple[str, ...]] = None
     context_window: int = 200000
     max_output_tokens: int = 8192
     model_family: str = ""
@@ -616,13 +624,73 @@ def _find_model_entry(models: Dict[str, Any], model: str) -> Optional[Dict[str, 
     return None
 
 
+def _model_lookup_variants(model: str) -> Tuple[str, ...]:
+    """Return metadata lookup IDs for a routed model without changing its ID.
+
+    Catalogs such as Nous Portal preserve the ``:free`` route suffix in the
+    selectable model ID, while models.dev records the underlying model without
+    that pricing tag. Keep the original value first, then try the underlying
+    route strictly for the known ``:free`` suffix.
+    """
+    value = (model or "").strip()
+    if value.lower().endswith(":free"):
+        return (value, value[: -len(":free")])
+    return (value,)
+
+
+_CANONICAL_REASONING_EFFORTS = frozenset({
+    "minimal",
+    "low",
+    "medium",
+    "high",
+    "xhigh",
+    "max",
+    "ultra",
+})
+
+
+def _extract_reasoning_efforts(reasoning_options: Any) -> Optional[Tuple[str, ...]]:
+    """Extract discrete effort values from models.dev's ``reasoning_options``.
+
+    The registry represents this as either one object or a list of controls.
+    Models with a ``toggle`` or ``budget_tokens`` control deliberately yield an
+    empty tuple: they can think, but Hermes must not invent a full effort
+    ladder for them. Unknown/malformed registry data returns ``None`` so
+    callers retain their backwards-compatible fallback behavior.
+    """
+    if reasoning_options is None:
+        return None
+
+    if isinstance(reasoning_options, dict):
+        options = [reasoning_options]
+    elif isinstance(reasoning_options, list):
+        options = reasoning_options
+    else:
+        return None
+
+    efforts: list[str] = []
+    for option in options:
+        if not isinstance(option, dict) or option.get("type") != "effort":
+            continue
+        values = option.get("values")
+        if not isinstance(values, list):
+            continue
+        for raw_value in values:
+            value = str(raw_value or "").strip().lower()
+            if value in _CANONICAL_REASONING_EFFORTS and value not in efforts:
+                efforts.append(value)
+
+    return tuple(efforts)
+
+
 def get_model_capabilities(provider: str, model: str) -> Optional[ModelCapabilities]:
     """Look up full capability metadata from models.dev cache.
 
     Uses the existing fetch_models_dev() and PROVIDER_TO_MODELS_DEV mapping.
     Returns None if model not found.
 
-    Extracts from model entry fields:
+    Extracts from model entry fields, including ``reasoning_options`` for the
+    model's exact named effort controls:
       - reasoning  (bool)  → supports_reasoning
       - tool_call  (bool)  → supports_tools
       - attachment (bool)  → supports_vision
@@ -631,10 +699,27 @@ def get_model_capabilities(provider: str, model: str) -> Optional[ModelCapabilit
       - family     (str)   → model_family
     """
     models = _get_provider_models(provider)
+    if models is None and (provider or "").strip().lower() in {
+        "nous",
+        "nous-portal",
+        "nousresearch",
+    }:
+        # Nous Portal's routed vendor catalog has no first-party models.dev
+        # provider row. OpenRouter publishes the same model identity metadata;
+        # only use it for this capability lookup so ``list_provider_models``
+        # cannot accidentally turn Nous into an OpenRouter catalog.
+        models = _get_provider_models("openrouter")
     if models is None:
         return None
 
-    entry = _find_model_entry(models, model)
+    entry = next(
+        (
+            candidate
+            for model_id in _model_lookup_variants(model)
+            if (candidate := _find_model_entry(models, model_id)) is not None
+        ),
+        None,
+    )
     if entry is None:
         return None
 
@@ -653,6 +738,7 @@ def get_model_capabilities(provider: str, model: str) -> Optional[ModelCapabilit
     else:
         supports_vision = bool(entry.get("attachment", False))
     supports_reasoning = bool(entry.get("reasoning", False))
+    reasoning_efforts = _extract_reasoning_efforts(entry.get("reasoning_options"))
 
     # Extract limits
     limit = entry.get("limit", {})
@@ -671,6 +757,7 @@ def get_model_capabilities(provider: str, model: str) -> Optional[ModelCapabilit
         supports_tools=supports_tools,
         supports_vision=supports_vision,
         supports_reasoning=supports_reasoning,
+        reasoning_efforts=reasoning_efforts,
         context_window=context_window,
         max_output_tokens=max_output_tokens,
         model_family=model_family,
@@ -683,13 +770,15 @@ def list_provider_models(provider: str) -> List[str]:
     Returns an empty list if the provider is unknown or has no data.
     """
     from hermes_cli.models import normalize_provider
+
     provider = normalize_provider(provider) or provider
-    
+
     models = _get_provider_models(provider)
     if models is None:
         return []
     return [
-        mid for mid in models.keys()
+        mid
+        for mid in models.keys()
         if not _should_hide_from_provider_catalog(provider, mid)
     ]
 
@@ -697,6 +786,7 @@ def list_provider_models(provider: str) -> List[str]:
 # Patterns that indicate non-agentic or noise models (TTS, embedding,
 # dated preview snapshots, live/streaming-only, image-only).
 import re
+
 _NOISE_PATTERNS: re.Pattern = re.compile(
     r"-tts\b|embedding|live-|-(preview|exp)-\d{2,4}[-_]|"
     r"-image\b|-image-preview\b|-customtools\b",
@@ -766,12 +856,14 @@ def list_agentic_models(provider: str) -> List[str]:
     return result
 
 
-
 # ---------------------------------------------------------------------------
 # Rich dataclass constructors — parse raw models.dev JSON into dataclasses
 # ---------------------------------------------------------------------------
 
-def _parse_model_info(model_id: str, raw: Dict[str, Any], provider_id: str) -> ModelInfo:
+
+def _parse_model_info(
+    model_id: str, raw: Dict[str, Any], provider_id: str
+) -> ModelInfo:
     """Convert a raw models.dev model entry dict into a ModelInfo dataclass."""
     limit = raw.get("limit") or {}
     if not isinstance(limit, dict):
@@ -813,8 +905,12 @@ def _parse_model_info(model_id: str, raw: Dict[str, Any], provider_id: str) -> M
         max_input=inp_int,
         cost_input=float(cost.get("input", 0) or 0),
         cost_output=float(cost.get("output", 0) or 0),
-        cost_cache_read=float(cost["cache_read"]) if "cache_read" in cost and cost["cache_read"] is not None else None,
-        cost_cache_write=float(cost["cache_write"]) if "cache_write" in cost and cost["cache_write"] is not None else None,
+        cost_cache_read=float(cost["cache_read"])
+        if "cache_read" in cost and cost["cache_read"] is not None
+        else None,
+        cost_cache_write=float(cost["cache_write"])
+        if "cache_write" in cost and cost["cache_write"] is not None
+        else None,
         knowledge_cutoff=raw.get("knowledge", "") or "",
         release_date=raw.get("release_date", "") or "",
         status=raw.get("status", "") or "",
@@ -840,6 +936,7 @@ def _parse_provider_info(provider_id: str, raw: Dict[str, Any]) -> ProviderInfo:
 # Provider-level queries
 # ---------------------------------------------------------------------------
 
+
 def get_provider_info(
     provider_id: str, *, allow_network: bool = True
 ) -> Optional[ProviderInfo]:
@@ -855,9 +952,7 @@ def get_provider_info(
     # sites monkeypatch fetch_models_dev with zero-arg lambdas; passing the
     # kwarg unconditionally would break them all (they raise TypeError).
     data = (
-        fetch_models_dev()
-        if allow_network
-        else fetch_models_dev(allow_network=False)
+        fetch_models_dev() if allow_network else fetch_models_dev(allow_network=False)
     )
     raw = data.get(mdev_id)
     if not isinstance(raw, dict):
@@ -870,9 +965,8 @@ def get_provider_info(
 # Model-level queries (rich ModelInfo)
 # ---------------------------------------------------------------------------
 
-def get_model_info(
-    provider_id: str, model_id: str
-) -> Optional[ModelInfo]:
+
+def get_model_info(provider_id: str, model_id: str) -> Optional[ModelInfo]:
     """Get full model metadata from models.dev.
 
     Accepts Hermes or models.dev provider ID.  Tries exact match then

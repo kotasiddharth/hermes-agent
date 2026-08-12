@@ -43,7 +43,6 @@ import { $activeGatewayProfile, normalizeProfileKey } from '@/store/profile'
 import { clearAllPrompts, setApprovalRequest, setSecretRequest, setSudoRequest } from '@/store/prompts'
 import { recordAgentReaction } from '@/store/reactions-local'
 import {
-  $currentCwd,
   $currentModel,
   $currentProvider,
   $selectedStoredSessionId,

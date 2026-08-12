@@ -420,6 +420,18 @@ export function ChatSidebar({
   // list inside the section, so it never changes a chat's project membership.
   const agentSessions = unpinnedAgentSessions
 
+  const worktreeGroupingActive = false
+  const gatewayReady = gatewayState === 'open'
+
+  const orderRepos = useCallback(
+    (repos: SidebarWorkspaceTree[]): SidebarWorkspaceTree[] =>
+      orderByIds(repos, parent => parent.id, workspaceParentOrderIds).map(parent => ({
+        ...parent,
+        groups: orderByIds(parent.groups, group => group.id, workspaceOrderIds)
+      })),
+    [workspaceParentOrderIds, workspaceOrderIds]
+  )
+
   // Recents are local-only: messaging-platform sessions are fetched as their
   // own slice ($messagingSessions) and rendered in self-managed per-platform
   // sections below, so there is no source-grouping magic to untangle here.

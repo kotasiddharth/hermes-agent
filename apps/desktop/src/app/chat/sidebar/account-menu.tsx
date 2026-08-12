@@ -14,6 +14,7 @@ import {
   DropdownMenuTrigger
 } from '@/components/ui/dropdown-menu'
 import { SidebarFooter } from '@/components/ui/sidebar'
+import type { DesktopCloudAccount } from '@/global'
 import { disconnectOAuthProvider, getNousPortalIdentity, listOAuthProviders } from '@/hermes'
 import { useI18n } from '@/i18n'
 import { Loader2, LogIn, PawPrint, Settings } from '@/lib/icons'

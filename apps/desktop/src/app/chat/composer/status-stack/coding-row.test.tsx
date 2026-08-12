@@ -37,6 +37,7 @@ vi.mock('@/store/projects', () => ({
 vi.mock('@/i18n', () => ({
   useI18n: () => ({
     t: {
+      common: { copy: 'Copy', copyFailed: 'Copy failed' },
       fileMenu: { copyPath: 'Copy Path' },
       rightSidebar: { changeCwdTitle: 'Change working directory' },
       sidebar: { projects: { convertBranch: 'Convert branch', startWork: 'Start work' } },

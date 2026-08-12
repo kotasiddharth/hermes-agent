@@ -11,6 +11,7 @@ import {
 import { setCronJobs } from '@/store/cron'
 import { $pinnedSessionIds, $sessionsLimit, bumpSessionsLimit, SIDEBAR_SESSIONS_PAGE_SIZE } from '@/store/layout'
 import { ALL_PROFILES, normalizeProfileKey } from '@/store/profile'
+import { $removedSessionIds } from '@/store/projects'
 import {
   $messagingSessions,
   $selectedStoredSessionId,
@@ -182,7 +183,13 @@ export function useSessionListActions({ profileScope }: UseSessionListActionsArg
 
         // The session list is authoritative for the flat sidebar. There is no
         // second project-tree snapshot to reconcile here.
-        const incoming = recents.sessions
+        const removedSessionIds = $removedSessionIds.get()
+
+        const incoming = recents.sessions.filter(
+          session =>
+            !removedSessionIds.has(session.id) &&
+            !(session._lineage_root_id != null && removedSessionIds.has(session._lineage_root_id))
+        )
 
         // Signature-gate the swap (same pattern as cron/messaging): a refresh
         // that returns content-identical rows must keep the previous array

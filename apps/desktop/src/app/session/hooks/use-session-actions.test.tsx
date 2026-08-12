@@ -571,7 +571,7 @@ describe('createBackendSessionForSend profile routing', () => {
     })
   })
 
-  it('falls back to the entered project cwd when the current cwd is blank', async () => {
+  it('omits cwd when the workspace target is blank', async () => {
     const params = await createWith(() => {
       $projectTree.set([
         {
@@ -586,7 +586,7 @@ describe('createBackendSessionForSend profile routing', () => {
       $currentCwd.set('')
     })
 
-    expect(params).toMatchObject({ cwd: '/repo/app' })
+    expect(params).not.toHaveProperty('cwd')
   })
 })
 

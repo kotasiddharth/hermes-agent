@@ -52,7 +52,7 @@ describe('TitlebarControls', () => {
 
     expect(await screen.findByRole('menuitem', { name: /new session/i })).toBeTruthy()
     expect(screen.getByRole('menuitem', { name: /new window/i })).toBeTruthy()
-    expect(screen.getByRole('menuitem', { name: /open folder as project/i })).toBeTruthy()
+    expect(screen.queryByRole('menuitem', { name: /open folder as project/i })).toBeNull()
   })
 
   it('does not duplicate the native macOS menu bar', () => {

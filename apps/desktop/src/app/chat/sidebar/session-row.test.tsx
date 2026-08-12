@@ -155,7 +155,7 @@ describe('SidebarSessionRow', () => {
 
     expect(shell?.className).toContain('min-h-7')
     expect(label.className).toContain('leading-4')
-    expect(label).toHaveAttribute('title', title)
+    expect(label.getAttribute('title')).toBe(title)
   })
 
   it('does not render a handoff avatar for a locally-started session', () => {

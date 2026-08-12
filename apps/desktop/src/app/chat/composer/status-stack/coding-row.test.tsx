@@ -37,7 +37,7 @@ vi.mock('@/store/projects', () => ({
 vi.mock('@/i18n', () => ({
   useI18n: () => ({
     t: {
-      common: { copy: 'Copy', copyFailed: 'Copy failed' },
+      common: { copy: 'Copy', copied: 'Copied', copyFailed: 'Copy failed', failed: 'Failed' },
       fileMenu: { copyPath: 'Copy Path' },
       rightSidebar: { changeCwdTitle: 'Change working directory' },
       sidebar: { projects: { convertBranch: 'Convert branch', startWork: 'Start work' } },
@@ -92,7 +92,7 @@ describe('CodingStatusRow', () => {
     const card = container.querySelector<HTMLElement>('[data-slot="coding-status-card"]')
 
     expect(card?.classList.contains('mb-1.5')).toBe(false)
-    expect(card?.classList.contains('mx-2.5')).toBe(true)
+    expect(card?.classList.contains('mx-9')).toBe(true)
     expect(card?.classList.contains('rounded-b-none')).toBe(true)
     expect(bar?.classList.contains('border-b')).toBe(false)
   })

@@ -1,9 +1,7 @@
 import { useStore } from '@nanostores/react'
-import { useQuery } from '@tanstack/react-query'
 import { useEffect, useState } from 'react'
 
 import { useSessionView } from '@/app/chat/session-view'
-import { useGatewayRequest } from '@/app/gateway/hooks/use-gateway-request'
 import { ModelMenuCloseContext } from '@/app/shell/model-menu-panel'
 import { Button } from '@/components/ui/button'
 import { DropdownMenu, DropdownMenuContent, DropdownMenuTrigger } from '@/components/ui/dropdown-menu'
@@ -15,9 +13,8 @@ import { compactNumber } from '@/lib/format'
 import { ChevronDown } from '@/lib/icons'
 import { formatModelStatusLabel } from '@/lib/model-status-label'
 import { cn } from '@/lib/utils'
-import { $activeGatewayProfile } from '@/store/profile'
 import { $currentModelSource, $defaultReasoningEffort, setModelPickerOpen } from '@/store/session'
-import type { ContextBreakdown, UsageStats } from '@/types/hermes'
+import type { UsageStats } from '@/types/hermes'
 
 import { onComposerModelMenuRequest } from './focus'
 import { useComposerScope } from './scope'
@@ -109,25 +106,10 @@ export function ModelPill({
   const defaultEffort = useStore($defaultReasoningEffort)
   const runtimeId = useStore(view.$runtimeId)
   const usage = useStore(view.$usage)
-  const activeGatewayProfile = useStore($activeGatewayProfile)
-  const { requestGateway } = useGatewayRequest()
   const [open, setOpen] = useState(false)
   const scope = useComposerScope()
   const hasLiveMenu = Boolean(model.modelMenuContent)
   const reportedContext = contextWindowUsage(usage)
-  const hasReportedContext = Boolean(reportedContext)
-
-  // Gateway usage intentionally omits context fields until it has an exact
-  // prompt-token reading. The context breakdown endpoint can calculate the
-  // current prompt footprint in that gap, so use it as a shared fallback.
-  // React Query deduplicates this per profile/session across tiled panes and
-  // refreshes it after usage changes instead of making each model pill poll.
-  const contextBreakdown = useQuery({
-    enabled: !compact && Boolean(runtimeId) && !hasReportedContext,
-    queryFn: () => requestGateway<ContextBreakdown>('session.context_breakdown', { session_id: runtimeId! }),
-    queryKey: ['session-context-breakdown', activeGatewayProfile, runtimeId, usage?.total ?? 0],
-    retry: false
-  })
 
   // The `composer.modelPicker` hotkey, routed to exactly one surface (the pane
   // under the pointer, else the active composer — see requestModelMenuToggle).
@@ -198,8 +180,10 @@ export function ModelPill({
     : copy.switchModel
 
   const title = pinnedOverride ? `${baseTitle} — ${copy.modelPinned}` : baseTitle
-  const calculatedContext = contextWindowUsage(contextBreakdown.data)
-  const context = compact ? null : (reportedContext ?? calculatedContext)
+  // The composer ring is intentionally measured-only. The context breakdown
+  // endpoint includes system prompts and tool schemas as an estimate, which
+  // makes a fresh chat look substantially used before its first response.
+  const context = compact ? null : reportedContext
   const contextPercent = Math.round(context?.percent ?? 0)
   const contextPercentRemaining = Math.max(0, 100 - contextPercent)
 

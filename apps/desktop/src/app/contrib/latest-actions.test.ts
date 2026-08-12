@@ -13,6 +13,7 @@ function makeChatActions(): ChatActions {
     onAttachImageBlob: vi.fn(),
     onBranchInNewChat: vi.fn(),
     onCancel: vi.fn(),
+    onChangeCwd: vi.fn(),
     onDeleteSelectedSession: vi.fn(),
     onDismissError: vi.fn(),
     onEdit: vi.fn(),
@@ -89,12 +90,14 @@ describe('latestActions adapters', () => {
   it('leaves absent optional handlers undefined instead of always-truthy wrappers', () => {
     const chat = makeChatActions()
     chat.onDismissError = undefined
+    chat.onChangeCwd = undefined
     chat.onRestoreToMessage = undefined
     chat.onTranscribeAudio = undefined
 
     const adaptedChat = latestChatActions(chat)
 
     expect(adaptedChat.onDismissError).toBeUndefined()
+    expect(adaptedChat.onChangeCwd).toBeUndefined()
     expect(adaptedChat.onRestoreToMessage).toBeUndefined()
     expect(adaptedChat.onTranscribeAudio).toBeUndefined()
 

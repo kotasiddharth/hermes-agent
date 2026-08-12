@@ -1825,9 +1825,11 @@ export interface Translations {
     editingInComposer: string
     editingQueuedInComposer: string
     queueEdit: string
+    queueSteer: string
     queueSendNext: string
     queueSend: string
     queueDelete: string
+    queueMoreActions: string
     queueResume: string
     queueResumeTip: string
     queueStuckTitle: string

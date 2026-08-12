@@ -51,6 +51,7 @@ import { shouldLatchBackendStartFailure, shouldLatchRemoteReauthFailure } from '
 import { detectRemoteDisplay, isWindowsBinaryPathInWsl, isWslEnvironment } from './bootstrap-platform'
 import { decideBootstrapRepair } from './bootstrap-repair-guard'
 import { runBootstrap } from './bootstrap-runner'
+import { trimCloudAccountIdentity } from './cloud-account'
 import { applyConnectionChange, resolveTerminalConnection } from './connection-apply'
 import {
   authModeFromStatus,
@@ -5422,20 +5423,6 @@ function sendClosePreviewRequested() {
   webContents.send('hermes:close-preview-requested')
 }
 
-function sendOpenFolderRequested() {
-  if (!mainWindow || mainWindow.isDestroyed()) {
-    return
-  }
-
-  const webContents = mainWindow.webContents
-
-  if (!webContents || webContents.isDestroyed()) {
-    return
-  }
-
-  webContents.send('hermes:open-folder-requested')
-}
-
 // Tell the renderer the machine just woke. Sleep silently drops the
 // renderer's WebSocket to the local backend; the renderer reconnects on this
 // signal so the chat composer doesn't stay stuck on "Starting Hermes...".
@@ -5584,7 +5571,6 @@ function buildApplicationMenu() {
       // Same no-accelerator rationale: ⌘O is the rebindable renderer keybind
       // (workspace.openFolder). Clicking runs the same open-folder-as-project
       // flow through the renderer.
-      { click: () => sendOpenFolderRequested(), label: 'Open Folder…' },
       { type: 'separator' },
       IS_MAC
         ? {
@@ -6083,7 +6069,7 @@ function warmOauthCookieStore() {
       // flushStorageData() forces Chromium to reconcile the in-memory cookie
       // monster with the on-disk SQLite store; the subsequent get() then reads
       // a populated jar rather than racing the lazy first-access load.
-      sess.flushStorageData?.()
+      await sess.flushStorageData?.()
       await sess.cookies.get({})
     } catch {
       // Best effort; the real read below re-checks with bounded retries.
@@ -6704,19 +6690,41 @@ async function hasLivePortalSession() {
   const portalBaseUrl = resolvePortalBaseUrl()
   const parsed = new URL(portalBaseUrl)
 
-  try {
-    const cookies = await sess.cookies.get({ url: portalBaseUrl })
-
-    return cookiesHavePrivySession(cookies)
-  } catch {
+  const readLive = async () => {
     try {
-      const cookies = await sess.cookies.get({ domain: parsed.hostname })
+      const cookies = await sess.cookies.get({ url: portalBaseUrl })
 
       return cookiesHavePrivySession(cookies)
     } catch {
-      return false
+      try {
+        const cookies = await sess.cookies.get({ domain: parsed.hostname })
+
+        return cookiesHavePrivySession(cookies)
+      } catch {
+        return false
+      }
     }
   }
+
+  if (await readLive()) {
+    return true
+  }
+
+  // The persistent OAuth partition can report an empty jar on its first
+  // read after launch, even when its portal login is still valid. Match the
+  // remote OAuth liveness guard before reporting that the account is signed
+  // out to the renderer.
+  await warmOauthCookieStore()
+
+  for (const delayMs of [30, 60, 90]) {
+    if (await readLive()) {
+      return true
+    }
+
+    await new Promise(resolve => setTimeout(resolve, delayMs))
+  }
+
+  return readLive()
 }
 
 // Drive a one-time interactive portal sign-in in the OAuth partition. Unlike
@@ -6726,6 +6734,7 @@ async function hasLivePortalSession() {
 // cascade. Resolves once the portal session cookie appears.
 function openPortalLoginWindow() {
   const portalBaseUrl = resolvePortalBaseUrl()
+  const portalLoginUrl = `${portalBaseUrl}/login`
 
   return new Promise((resolve, reject) => {
     if (!app.isReady()) {
@@ -6814,9 +6823,10 @@ function openPortalLoginWindow() {
       }
     })
 
-    // Land on the portal root; any authenticated portal page sets the session
-    // cookie. We only care that the partition cookie jar is populated.
-    win.loadURL(portalBaseUrl).catch(error => {
+    // Use the portal's actual login route rather than the marketing landing
+    // page. A signed-in user continues through immediately; an unsigned user
+    // is shown the authentication controls without an extra click.
+    win.loadURL(portalLoginUrl).catch(error => {
       finish(error instanceof Error ? error : new Error(String(error)))
     })
   })
@@ -6876,6 +6886,31 @@ async function discoverCloudAgents(org?: string) {
   }
 
   return { agents: trimCloudAgents(body), org: trimCloudOrg(body?.org) }
+}
+
+// Read the signed-in Portal identity through the same sealed OAuth partition
+// used for Cloud discovery. Only `displayName` and `email` cross the IPC
+// boundary; billing, org, and all other Portal fields stay in the main process.
+async function getCloudAccountIdentity() {
+  const portalBaseUrl = resolvePortalBaseUrl()
+
+  if (!(await hasLivePortalSession())) {
+    return { signedIn: false, displayName: null, email: null }
+  }
+
+  try {
+    const body = await fetchJsonViaOauthSession(`${portalBaseUrl}/api/oauth/account`, {
+      method: 'GET',
+      timeoutMs: 8_000
+    })
+
+    return { signedIn: true, ...trimCloudAccountIdentity(body) }
+  } catch {
+    // A live cookie can outlast a failed identity request (for example during a
+    // short Portal deploy). Keep the authenticated state truthful and let the
+    // UI use its neutral fallback label instead of incorrectly signing out.
+    return { signedIn: true, displayName: null, email: null }
+  }
 }
 
 // Project a NAS response org ({ id, slug, name, isPersonal }) to the trimmed
@@ -10213,6 +10248,7 @@ ipcMain.handle('hermes:cloud:status', async () => ({
   portalBaseUrl: resolvePortalBaseUrl(),
   signedIn: await hasLivePortalSession()
 }))
+ipcMain.handle('hermes:cloud:account', async () => getCloudAccountIdentity())
 ipcMain.handle('hermes:cloud:login', async () => {
   await openPortalLoginWindow()
 

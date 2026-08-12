@@ -571,6 +571,11 @@ export function TreeSplit({ node, root, rootRow }: { node: SplitNode; root?: boo
             aria-hidden={collapsed || undefined}
             className={cn(
               'relative flex min-h-0 min-w-0 overflow-hidden transition-[flex-basis,flex-grow,opacity,transform] duration-250 ease-[cubic-bezier(0.16,1,0.3,1)] will-change-[flex-basis,opacity,transform]',
+              // The workspace group clips its own rounded top-left corner.
+              // Keep the track behind that cutout on the sidebar/chrome
+              // surface so the curve remains visible even though the editor
+              // canvas intentionally shares the app's chrome color.
+              workspaceOwnsSeam && 'bg-(--ui-sidebar-surface-background)',
               collapsed && 'pointer-events-none'
             )}
             data-collapsed={collapsed || undefined}

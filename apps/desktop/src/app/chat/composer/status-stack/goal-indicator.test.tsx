@@ -35,6 +35,16 @@ function renderStack(sessionId: null | string = SID) {
   )
 }
 
+function renderQueueStack() {
+  return render(
+    <MemoryRouter>
+      <I18nProvider configClient={null} initialLocale="en">
+        <ComposerStatusStack queue={<div>queue message</div>} sessionId={SID} />
+      </I18nProvider>
+    </MemoryRouter>
+  )
+}
+
 describe('ComposerStatusStack goal indicator', () => {
   beforeEach(() => {
     $goalsBySession.set({})
@@ -76,6 +86,15 @@ describe('ComposerStatusStack goal indicator', () => {
     renderStack()
 
     expect(screen.getByText('Continuing toward goal (3/20)')).toBeTruthy()
+  })
+
+  it('attaches a lone queue to the composer as its top rail', () => {
+    const view = renderQueueStack()
+    const card = view.container.querySelector('[data-slot="composer-status-card"]')
+
+    expect(screen.getByText('queue message')).toBeTruthy()
+    expect(card?.classList.contains('mb-1.5')).toBe(false)
+    expect(card?.classList.contains('rounded-b-none')).toBe(true)
   })
 
   it('scopes the indicator to the goal-owning session', () => {

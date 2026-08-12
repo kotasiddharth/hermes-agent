@@ -69,6 +69,12 @@ export interface OAuthProvidersResponse {
   providers: OAuthProvider[]
 }
 
+/** A minimal, safe identity projection for the active Nous Portal account. */
+export interface NousPortalIdentity {
+  display_name: null | string
+  email: null | string
+}
+
 export type OAuthStartResponse =
   | {
       auth_url: string
@@ -423,10 +429,6 @@ export interface ModelOptionProvider {
 export interface ModelCapabilities {
   fast: boolean
   reasoning: boolean
-  /** Exact named reasoning levels advertised by this model. Omitted when the
-   *  gateway cannot determine them; an empty array means reasoning is
-   *  toggle/budget-only and has no discrete effort picker. */
-  reasoning_efforts?: string[]
 }
 
 export interface ModelOptionsResponse {

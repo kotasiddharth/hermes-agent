@@ -1,5 +1,5 @@
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
-import { cleanup, screen, render as testingRender, waitFor } from '@testing-library/react'
+import { cleanup, screen, render as testingRender } from '@testing-library/react'
 import { atom } from 'nanostores'
 import type { ReactElement } from 'react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
@@ -173,25 +173,15 @@ describe('ModelPill context window', () => {
     ).toMatchObject({ max: 128_000, percent: 25, used: 32_000 })
   })
 
-  it('calculates context usage when the session usage snapshot does not include it', async () => {
+  it('does not estimate context occupancy before measured usage arrives', async () => {
     $activeSessionId.set('runtime-1')
-    requestGatewayMock.mockResolvedValueOnce({
-      categories: [],
-      context_max: 258_000,
-      context_percent: 42,
-      context_used: 107_000,
-      estimated_total: 107_000,
-      model: 'gpt-6'
-    })
 
     render(<ModelPill disabled={false} model={modelState()} />)
 
-    await waitFor(() => {
-      expect(screen.getByTestId('context-window').getAttribute('aria-label')).toBe(
-        'Context window. 42% used (58% left). 107k / 258k tokens used.'
-      )
-    })
-    expect(requestGatewayMock).toHaveBeenCalledWith('session.context_breakdown', { session_id: 'runtime-1' })
+    expect(screen.getByTestId('context-window').getAttribute('aria-label')).toBe(
+      'Context window data is not available yet.'
+    )
+    expect(requestGatewayMock).not.toHaveBeenCalled()
   })
 
   it('keeps an empty ring visible for a draft without a session', () => {

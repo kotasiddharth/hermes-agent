@@ -20,7 +20,6 @@ import { triggerHaptic } from '@/lib/haptics'
 import { cn } from '@/lib/utils'
 import { $fileBrowserOpen, $sidebarOpen, toggleFileBrowserOpen, toggleSidebarOpen } from '@/store/layout'
 import { requestFreshSession } from '@/store/profile'
-import { openFolderAsProject } from '@/store/projects'
 import { openUpdatesWindow } from '@/store/updates'
 import { openNewWindow } from '@/store/windows'
 
@@ -180,17 +179,9 @@ export function TitlebarControls({
         toggleLayoutEditMode()
       },
       title: t.titlebar.layoutEditorTitle
-    },
-    {
-      actionId: 'nav.settings',
-      icon: <Codicon name="settings-gear" />,
-      id: 'settings',
-      label: t.titlebar.openSettings,
-      onSelect: () => {
-        triggerHaptic('open')
-        onOpenSettings()
-      }
     }
+    // Settings stays available from the app menu and normal navigation; keep
+    // the native titlebar focused on window and layout controls.
   ]
 
   // While a full-screen overlay (settings, command center, …) is open it should
@@ -340,16 +331,6 @@ function TitlebarAppMenu({
         >
           <Codicon name="empty-window" />
           {t.keybinds.actions['session.newWindow']}
-        </DropdownMenuItem>
-        <DropdownMenuSeparator />
-        <DropdownMenuItem
-          onSelect={() => {
-            triggerHaptic('open')
-            void openFolderAsProject()
-          }}
-        >
-          <Codicon name="folder-opened" />
-          {t.keybinds.actions['workspace.openFolder']}
         </DropdownMenuItem>
       </TitlebarMenu>
 

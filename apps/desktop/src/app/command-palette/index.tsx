@@ -13,7 +13,6 @@ import {
   HUD_SURFACE,
   HUD_TEXT
 } from '@/app/floating-hud'
-import { codiconIcon } from '@/components/ui/codicon'
 import { Command, CommandGroup, CommandInput, CommandItem, CommandList } from '@/components/ui/command'
 import { HighlightMatches } from '@/components/ui/highlight-matches'
 import { KbdCombo } from '@/components/ui/kbd'
@@ -32,7 +31,6 @@ import {
   Cpu,
   Download,
   Egg,
-  GitBranch,
   Globe,
   type IconComponent,
   Info,
@@ -56,7 +54,6 @@ import {
 import { normalize } from '@/lib/text'
 import { cn } from '@/lib/utils'
 import { resolveVersionStatus } from '@/lib/version-status'
-import { $repoWorktrees } from '@/store/coding-status'
 import {
   $commandPaletteOpen,
   $commandPalettePage,
@@ -64,9 +61,7 @@ import {
   setCommandPaletteOpen
 } from '@/store/command-palette'
 import { $bindings, bindingsFor } from '@/store/keybinds'
-import { $dismissedAutoProjectIds, filterVisibleProjects } from '@/store/layout'
 import { openPetGenerate } from '@/store/pet-generate'
-import { $projectTree, goToProject, openFolderAsProject, requestStartWorkSession } from '@/store/projects'
 import { $connection } from '@/store/session'
 import { runGatewayRestart } from '@/store/system-actions'
 import {
@@ -368,7 +363,6 @@ const SESSION_ID_RE = /^\d{8}_\d{6}_[a-f0-9]{6}$/
 // Deliberately NOT `~/…`: the upsert's membership check (projectIdForCwd)
 // compares literal strings against the tree's absolute paths, so an unexpanded
 // home path would always miss and double-create.
-const FOLDER_PATH_RE = /^(\/|[A-Za-z]:[/\\]).+/
 
 type SessionRow = Awaited<ReturnType<typeof listAllProfileSessions>>['sessions'][number]
 
@@ -522,9 +516,6 @@ function CommandPaletteBody({ onExited }: { onExited: () => void }) {
   const { t } = useI18n()
   const pendingPage = useStore($commandPalettePage)
   const bindings = useStore($bindings)
-  const worktrees = useStore($repoWorktrees)
-  const projectTree = useStore($projectTree)
-  const dismissedAutoProjects = useStore($dismissedAutoProjectIds)
   const navigate = useNavigate()
   const { availableThemes, mode, resolvedMode, setMode, setTheme, themeName } = useTheme()
   const [search, setSearch] = useState('')
@@ -664,66 +655,9 @@ function CommandPaletteBody({ onExited }: { onExited: () => void }) {
 
   const contributedItems = usePaletteContributions()
 
-  // The active repo's worktrees → "new conversation in <branch>". This is the
-  // ⌘K-typed "I want to work on <branch>" reflex: each entry seeds a fresh
-  // session anchored to that worktree's checkout (requestStartWorkSession),
-  // so git is the source of truth and edits land in the right tree.
-  const branchGroup = useMemo<PaletteGroup[]>(
-    () =>
-      worktrees.length > 0
-        ? [
-            {
-              heading: t.commandCenter.branches,
-              items: worktrees.map(wt => {
-                const name = wt.branch?.trim() || wt.path.split('/').pop() || wt.path
-
-                return {
-                  icon: GitBranch,
-                  id: `worktree-${wt.path}`,
-                  keywords: ['branch', 'worktree', 'switch', name, wt.path],
-                  label: t.commandCenter.startInBranch(name),
-                  run: () => requestStartWorkSession(wt.path)
-                }
-              })
-            }
-          ]
-        : [],
-    [t, worktrees]
-  )
-
   const baseGroups = useMemo<PaletteGroup[]>(() => {
     const settingsTab = (tab: string) => `${SETTINGS_ROUTE}?tab=${tab}`
     const cc = t.commandCenter
-
-    // Projects are the primary way the desktop scopes work, so they're jumpable
-    // from the palette. Plain select is a pure scope switch (sidebar enters the
-    // project — never spends main); ⌘-Enter / ⌘-click also starts a new session
-    // at the project root (stacked as a tab when main holds a chat), previewed
-    // by the label swap while ⌘ is held. Rows carry the project's own codicon,
-    // matching the sidebar. The pinned "Open folder…" row is the ⌘O upsert.
-    const projectGroup: PaletteGroup = {
-      heading: cc.projects,
-      items: [
-        {
-          action: 'workspace.openFolder',
-          icon: codiconIcon('folder-opened'),
-          id: 'project-open-folder',
-          keywords: ['open', 'folder', 'directory', 'project', 'add', 'import', 'workspace'],
-          label: cc.openFolder,
-          run: () => void openFolderAsProject()
-        },
-        ...filterVisibleProjects(projectTree, dismissedAutoProjects).map(project => ({
-          comboHint: 'mod+enter',
-          icon: codiconIcon(project.icon || (project.isNoProject ? 'home' : 'folder-library')),
-          id: `project-${project.id}`,
-          keywords: ['project', 'workspace', 'go to', project.label, ...(project.path ? [project.path] : [])],
-          label: project.label,
-          modLabel: cc.newSessionInProject(project.label),
-          runWithEvent: (event?: { ctrlKey?: boolean; metaKey?: boolean; shiftKey?: boolean }) =>
-            goToProject(project.id, { newSession: Boolean(event?.metaKey || event?.ctrlKey) })
-        }))
-      ]
-    }
 
     // Group order is the tiebreaker rankGroups falls back on (stable sort), and
     // exact ties are the common case — "yolo" hits both "Toggle yolo" and a
@@ -800,7 +734,6 @@ function CommandPaletteBody({ onExited }: { onExited: () => void }) {
           }
         ]
       },
-      projectGroup,
       // Registry-contributed rows (core features + plugins) — one group,
       // omitted while nothing contributes.
       ...(contributedItems.length > 0
@@ -926,9 +859,7 @@ function CommandPaletteBody({ onExited }: { onExited: () => void }) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [
     contributedItems,
-    dismissedAutoProjects,
     go,
-    projectTree,
     selectTick,
     settingsSectionLabel,
     t,
@@ -966,20 +897,6 @@ function CommandPaletteBody({ onExited }: { onExited: () => void }) {
     // Paste/type an absolute folder path → open it as a project directly (the
     // ⌘O upsert without the native picker). Same reflex as the raw-session-id
     // row above.
-    if (FOLDER_PATH_RE.test(directId)) {
-      result.push({
-        items: [
-          {
-            icon: codiconIcon('folder-opened'),
-            id: `open-folder-${directId}`,
-            keywords: ['open', 'folder', 'project', directId],
-            label: t.commandCenter.openFolderAt(directId),
-            run: () => void openFolderAsProject(directId)
-          }
-        ]
-      })
-    }
-
     // Deep-link straight to an Installed category. The root "Go to" entry only
     // lands on Capabilities; typing a specific kind should open its section.
     const capLabel = t.commandCenter.nav.skills.title
@@ -1126,10 +1043,7 @@ function CommandPaletteBody({ onExited }: { onExited: () => void }) {
   // scale with whatever worktrees happen to exist, so on a tie they're the least
   // likely thing meant. Everything above is either always-present chrome or a
   // list the search itself asked for.
-  const groups = useMemo(
-    () => [...baseGroups, ...searchGroups, ...branchGroup],
-    [baseGroups, branchGroup, searchGroups]
-  )
+  const groups = useMemo(() => [...baseGroups, ...searchGroups], [baseGroups, searchGroups])
 
   // Nested palette pages (VS Code-style submenus). Reusable: add an entry here
   // and point a root item at it via `to`.

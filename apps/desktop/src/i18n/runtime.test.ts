@@ -36,6 +36,15 @@ describe('desktop i18n runtime translator', () => {
     expect(translateNow('cron.promptPlaceholder')).toBe('代理每次執行時應做什麼？')
   })
 
+  it('keeps the compact queue rail actions localized', () => {
+    for (const locale of ['en', 'zh', 'zh-hant', 'ja', 'ar'] as const) {
+      setRuntimeI18nLocale(locale)
+
+      expect(translateNow('composer.queueSteer')).not.toBe('composer.queueSteer')
+      expect(translateNow('composer.queueMoreActions')).not.toBe('composer.queueMoreActions')
+    }
+  })
+
   it('translates settings copy for newly supported locales', () => {
     setRuntimeI18nLocale('ja')
     expect(translateNow('settings.appearance.title')).toBe('外観')

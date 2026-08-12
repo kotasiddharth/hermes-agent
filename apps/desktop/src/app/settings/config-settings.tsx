@@ -21,7 +21,6 @@ import {
   setDataUrlReadMaxMb
 } from '@/store/data-url-read-max'
 import { notify, notifyError } from '@/store/notifications'
-import { repoDiscoveryPolicyFromConfig, repoDiscoveryPolicySignature, scanAndRecordRepos } from '@/store/projects'
 import { applyAutoSpeakFromConfig } from '@/store/voice-prefs'
 import { $wakeWord, setWakeWordEnabled } from '@/store/wake-word'
 import type { ConfigFieldSchema, HermesConfigRecord } from '@/types/hermes'
@@ -91,7 +90,6 @@ export function ConfigSettings({
   const [elevenLabsVoiceOptions, setElevenLabsVoiceOptions] = useState<string[] | null>(null)
   const [elevenLabsVoiceLabels, setElevenLabsVoiceLabels] = useState<Record<string, string>>({})
   const saveVersionRef = useRef(0)
-  const savedDiscoverySignatureRef = useRef<string | undefined>(undefined)
   const [saveVersion, setSaveVersion] = useState(0)
 
   // Seed the local draft once, the first time the shared record lands.
@@ -102,7 +100,6 @@ export function ConfigSettings({
   useEffect(() => {
     if (loadedConfig && !configSeeded.current) {
       configSeeded.current = true
-      savedDiscoverySignatureRef.current = repoDiscoveryPolicySignature(repoDiscoveryPolicyFromConfig(loadedConfig))
       setConfig(loadedConfig)
     }
   }, [loadedConfig])
@@ -113,7 +110,6 @@ export function ConfigSettings({
   // the pending debounced autosave is cancelled by its effect cleanup.
   useOnProfileSwitch(() => {
     configSeeded.current = false
-    savedDiscoverySignatureRef.current = undefined
     setConfig(null)
     saveVersionRef.current = 0
     setSaveVersion(0)
@@ -163,13 +159,6 @@ export function ConfigSettings({
           setHermesConfigCache(config)
 
           if (saveVersionRef.current === v) {
-            const discoverySignature = repoDiscoveryPolicySignature(repoDiscoveryPolicyFromConfig(config))
-
-            if (savedDiscoverySignatureRef.current !== discoverySignature) {
-              savedDiscoverySignatureRef.current = discoverySignature
-              await scanAndRecordRepos(true)
-            }
-
             onConfigSaved?.()
           }
         } catch (err) {

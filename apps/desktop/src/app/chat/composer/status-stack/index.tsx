@@ -207,6 +207,11 @@ export function ComposerStatusStack({ queue, sessionId }: ComposerStatusStackPro
     sections.push({ key: 'queue', node: queue })
   }
 
+  // A queued prompt is an action queued for this composer, not independent
+  // status. When it is the only section, make it the composer's attached top
+  // rail instead of a detached second card.
+  const queueOnly = sections.length === 1 && sections[0]?.key === 'queue'
+
   // Micro actions are the TOP-MOST thing in the whole overlay lane — above the
   // status card, above the billing wall, above everything. They're the only
   // rows up here you press instead of read, so nothing may ever stack on top
@@ -238,10 +243,13 @@ export function ComposerStatusStack({ queue, sessionId }: ComposerStatusStackPro
       {sections.length > 0 && (
         <div
           className={cn(
-            composerDockCard('full'),
-            // Inset (mx-2) so the stack reads slightly narrower than the composer
-            // surface below it — the original look.
-            'mx-2 mb-1.5 overflow-hidden pt-0.5',
+            queueOnly ? composerDockCard('top') : composerDockCard('full'),
+            // The queue meets the composer at one shared seam while staying
+            // narrower than the input surface; other status cards remain
+            // independently rounded and spaced above it.
+            queueOnly
+              ? 'mx-9 overflow-hidden rounded-b-none border-b border-b-transparent pt-0.5'
+              : 'mx-2.5 mb-1.5 overflow-hidden pt-0.5',
             'transition-opacity duration-200 ease-out',
             scrolledUp ? 'opacity-30 group-hover/composer:opacity-100' : 'opacity-100'
           )}

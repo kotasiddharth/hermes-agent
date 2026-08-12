@@ -2,15 +2,12 @@ import { describe, expect, it } from 'vitest'
 
 import {
   DEFAULT_REASONING_EFFORT,
-  highestAdvertisedReasoningEffort,
   isReasoningEffort,
   isThinkingEnabled,
   REASONING_EFFORT_VALUES,
   REASONING_EFFORTS,
   reasoningEffortLabel,
-  resolveReasoningEffort,
-  resolveSupportedReasoningEffort,
-  supportedReasoningEfforts
+  resolveReasoningEffort
 } from './reasoning-effort'
 
 describe('reasoning-effort', () => {
@@ -52,27 +49,5 @@ describe('reasoning-effort', () => {
     // Off selects nothing on the scale.
     expect(resolveReasoningEffort('none')).toBe('')
     expect(resolveReasoningEffort('bogus')).toBe(DEFAULT_REASONING_EFFORT)
-  })
-
-  it('uses the model-advertised levels instead of the global ladder', () => {
-    expect(supportedReasoningEfforts(['high', 'low', 'max', 'unknown', 'low'])).toEqual(['low', 'high', 'max'])
-    // No metadata keeps older gateways and custom endpoints backwards-compatible.
-    expect(supportedReasoningEfforts(undefined)).toEqual(REASONING_EFFORTS)
-    // An explicit toggle-only model has no named effort choices.
-    expect(supportedReasoningEfforts([])).toEqual([])
-  })
-
-  it('returns a ceiling only when a model explicitly advertises one', () => {
-    expect(highestAdvertisedReasoningEffort(['high', 'low', 'max', 'unknown'])).toBe('max')
-    expect(highestAdvertisedReasoningEffort([])).toBeUndefined()
-    expect(highestAdvertisedReasoningEffort(undefined)).toBeUndefined()
-  })
-
-  it('clamps an unsupported requested level to the model ceiling', () => {
-    expect(resolveSupportedReasoningEffort('max', 'medium', ['low', 'medium', 'high'])).toBe('high')
-    expect(resolveSupportedReasoningEffort('minimal', 'medium', ['high', 'max'])).toBe('high')
-    expect(resolveSupportedReasoningEffort('none', 'medium', ['low', 'high'])).toBe('none')
-    // Toggle-only providers still receive a valid generic on-state.
-    expect(resolveSupportedReasoningEffort('max', 'medium', [])).toBe('max')
   })
 })

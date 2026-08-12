@@ -37,7 +37,6 @@ import { sessionTitle } from '@/lib/chat-runtime'
 import { createComposerAttachmentScope } from '@/store/composer'
 import { $pinnedSessionIds, pinSession, unpinSession } from '@/store/layout'
 import { $activeGatewayProfile } from '@/store/profile'
-import { $projectTree } from '@/store/projects'
 import { sessionAwaitingInput } from '@/store/prompts'
 import {
   $gatewayState,
@@ -201,6 +200,7 @@ function TileChat({
           onAttachDroppedItems={composer.attachDroppedItems}
           onAttachImageBlob={composer.attachImageBlob}
           onCancel={actions.cancelRun}
+          onChangeCwd={actions.changeCwd}
           onDeleteSelectedSession={noop}
           onDismissError={actions.dismissError}
           onEdit={actions.editMessage}
@@ -366,13 +366,7 @@ export function SessionTilePane({ storedSessionId }: { storedSessionId: string }
 export function tileStoredRow(storedSessionId: string): SessionInfo | undefined {
   const match = (s: SessionInfo) => sessionMatchesStoredId(s, storedSessionId)
 
-  return (
-    $sessions.get().find(match) ??
-    $projectTree
-      .get()
-      .flatMap(p => [...p.repos.flatMap(r => r.groups.flatMap(g => g.sessions)), ...(p.previewSessions ?? [])])
-      .find(match)
-  )
+  return $sessions.get().find(match)
 }
 
 function tileTitle(storedSessionId: string): string {
@@ -464,11 +458,9 @@ function useTileMenuRow(storedSessionId: string): { pinId: string; profile?: str
 
   const subscribe = useCallback((onChange: () => void) => {
     const offSessions = $sessions.listen(onChange)
-    const offTree = $projectTree.listen(onChange)
 
     return () => {
       offSessions()
-      offTree()
     }
   }, [])
 
@@ -574,7 +566,7 @@ export const watchSessionTiles = paneMirror<SessionTile>({
   // $projectTree: a tile whose session is older than the recents page resolves
   // its title through the tree, which loads after the tiles register. (The tab's
   // status dot subscribes to color/state itself, so it needs no `also` entry.)
-  also: [$sessions, $projectTree],
+  also: [$sessions],
   key: t => t.storedSessionId,
   prefix: 'session-tile',
   dir: t => t.dir,

@@ -34,6 +34,7 @@ export type ChatActions = Pick<
   | 'onAttachImageBlob'
   | 'onBranchInNewChat'
   | 'onCancel'
+  | 'onChangeCwd'
   | 'onDeleteSelectedSession'
   | 'onDismissError'
   | 'onEdit'

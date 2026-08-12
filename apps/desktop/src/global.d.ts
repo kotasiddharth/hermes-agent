@@ -104,6 +104,7 @@ declare global {
       // sign-in (cloud-auto-discovery Phase 3).
       cloud: {
         status: () => Promise<DesktopCloudStatus>
+        account: () => Promise<DesktopCloudAccount>
         login: () => Promise<DesktopCloudStatus & { ok: boolean }>
         logout: () => Promise<DesktopCloudStatus & { ok: boolean }>
         discover: (org?: string) => Promise<DesktopCloudDiscoverResult>
@@ -648,6 +649,13 @@ export interface DesktopCloudStatus {
 }
 
 // A discovered Hermes Cloud agent — the trimmed DTO from NAS GET /api/agents.
+/** Safe identity projection from the signed-in Nous Portal account. */
+export interface DesktopCloudAccount {
+  displayName: null | string
+  email: null | string
+  signedIn: boolean
+}
+
 export interface DesktopCloudAgent {
   id: string
   name: string

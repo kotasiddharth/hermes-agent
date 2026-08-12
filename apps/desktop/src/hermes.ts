@@ -39,6 +39,7 @@ import type {
   ModelAssignmentResponse,
   ModelInfoResponse,
   ModelOptionsResponse,
+  NousPortalIdentity,
   OAuthPollResponse,
   OAuthProvidersResponse,
   OAuthStartResponse,
@@ -886,6 +887,13 @@ export function listOAuthProviders(): Promise<OAuthProvidersResponse> {
   })
 }
 
+export function getNousPortalIdentity(): Promise<NousPortalIdentity> {
+  return window.hermesDesktop.api<NousPortalIdentity>({
+    ...profileScoped(),
+    path: '/api/portal/identity'
+  })
+}
+
 export function disconnectOAuthProvider(providerId: string): Promise<{ ok: boolean; provider: string }> {
   return window.hermesDesktop.api<{ ok: boolean; provider: string }>({
     ...profileScoped(),
@@ -1079,7 +1087,11 @@ export function getMcpOAuthFlow(flowId: string): Promise<McpOAuthFlow> {
 export function getGoogleWorkspaceStatus(): Promise<GoogleWorkspaceStatus> {
   return window.hermesDesktop.api<GoogleWorkspaceStatus>({
     ...profileScoped(),
-    path: '/api/google-workspace/status'
+    path: '/api/google-workspace/status',
+    // This endpoint only reads the active profile's credential metadata. Keep
+    // it bounded so a backend that is starting or temporarily unavailable
+    // cannot leave the integrations card waiting forever.
+    timeoutMs: 15_000
   })
 }
 

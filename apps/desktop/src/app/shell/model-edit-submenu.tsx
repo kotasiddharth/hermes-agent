@@ -10,14 +10,7 @@ import {
 } from '@/components/ui/dropdown-menu'
 import { Switch } from '@/components/ui/switch'
 import { useI18n } from '@/i18n'
-import {
-  DEFAULT_REASONING_EFFORT,
-  highestAdvertisedReasoningEffort,
-  isThinkingEnabled,
-  resolveSupportedReasoningEffort,
-  supportedReasoningEfforts
-} from '@/lib/reasoning-effort'
-import { cn } from '@/lib/utils'
+import { isThinkingEnabled, REASONING_EFFORTS, resolveReasoningEffort } from '@/lib/reasoning-effort'
 
 // Hermes' real reasoning levels live in lib/reasoning-effort; `none` is owned
 // by the Thinking toggle, not the radio.
@@ -89,9 +82,6 @@ interface ModelEditSubmenuProps {
   provider: string
   /** Whether this model supports reasoning effort. */
   reasoning: boolean
-  /** Exact named levels advertised by this model. Undefined preserves the
-   *  legacy full ladder for older gateways; [] means toggle-only reasoning. */
-  reasoningEfforts?: readonly string[]
 }
 
 export function ModelEditSubmenu(props: ModelEditSubmenuProps) {
@@ -114,24 +104,13 @@ function ModelEditSubmenuBody({
   isActive,
   onSelectModel,
   onSetOptions,
-  reasoning,
-  reasoningEfforts
+  reasoning
 }: ModelEditSubmenuProps) {
   const { t } = useI18n()
   const copy = t.shell.modelOptions
 
-  const resolvedEffort = resolveSupportedReasoningEffort(effort, defaultEffort, reasoningEfforts)
-  const effortValue = resolvedEffort === 'none' ? '' : resolvedEffort
+  const effortValue = resolveReasoningEffort(effort, defaultEffort)
   const thinkingOn = isThinkingEnabled(effort, defaultEffort)
-  const selectableEfforts = supportedReasoningEfforts(reasoningEfforts)
-  const hasSelectableEfforts = reasoningEfforts === undefined || selectableEfforts.length > 0
-  const highestEffort = highestAdvertisedReasoningEffort(reasoningEfforts)
-
-  const enabledEffort = resolveSupportedReasoningEffort(
-    defaultEffort === 'none' ? DEFAULT_REASONING_EFFORT : defaultEffort,
-    DEFAULT_REASONING_EFFORT,
-    reasoningEfforts
-  )
 
   const setFast = (enabled: boolean) => {
     if (fastControl.kind === 'variant') {
@@ -166,7 +145,7 @@ function ModelEditSubmenuBody({
           <Switch
             checked={thinkingOn}
             className="ml-auto"
-            onCheckedChange={checked => onSetOptions({ effort: checked ? effortValue || enabledEffort : 'none' })}
+            onCheckedChange={checked => onSetOptions({ effort: checked ? effortValue || defaultEffort : 'none' })}
             size="xs"
           />
         </DropdownMenuItem>
@@ -177,19 +156,14 @@ function ModelEditSubmenuBody({
           <Switch checked={fastOn} className="ml-auto" onCheckedChange={setFast} size="xs" />
         </DropdownMenuItem>
       ) : null}
-      {reasoning && hasSelectableEfforts ? (
+      {reasoning ? (
         <>
           <DropdownMenuSeparator className="mx-0" />
           <DropdownMenuLabel className={dropdownMenuSectionLabel}>{copy.effort}</DropdownMenuLabel>
           <DropdownMenuRadioGroup onValueChange={value => onSetOptions({ effort: value })} value={effortValue}>
-            {selectableEfforts.map(value => (
+            {REASONING_EFFORTS.map(value => (
               <DropdownMenuRadioItem
-                className={cn(
-                  dropdownMenuRow,
-                  value === highestEffort &&
-                    'font-medium text-violet-600 focus:text-violet-600 dark:text-violet-400 dark:focus:text-violet-400'
-                )}
-                data-highest-effort={value === highestEffort ? '' : undefined}
+                className={dropdownMenuRow}
                 key={value}
                 onSelect={event => event.preventDefault()}
                 value={value}

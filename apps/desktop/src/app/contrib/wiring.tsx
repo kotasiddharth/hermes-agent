@@ -46,7 +46,6 @@ import {
   normalizeProfileKey,
   refreshActiveProfile
 } from '@/store/profile'
-import { $startWorkSessionRequest, followActiveSessionCwd } from '@/store/projects'
 import {
   $activeSessionId,
   $connection,
@@ -270,7 +269,7 @@ export function ContribWiring({ children }: { children: ReactNode }) {
     [activeSessionIdRef, updateSessionState]
   )
 
-  const { refreshProjectBranch } = useCwdActions({
+  const { changeSessionCwd, refreshProjectBranch } = useCwdActions({
     activeSessionIdRef,
     onSessionRuntimeInfo: updateActiveSessionRuntimeInfo,
     requestGateway
@@ -515,7 +514,6 @@ export function ContribWiring({ children }: { children: ReactNode }) {
 
       startWorkspaceSession({
         activeSessionIdRef,
-        followActiveSessionCwd,
         onExplicitWorkspace: restoreWorktree,
         path,
         requestGateway,
@@ -524,25 +522,6 @@ export function ContribWiring({ children }: { children: ReactNode }) {
     },
     [activeSessionIdRef, openNewSessionTile, requestGateway, startFreshSessionDraft]
   )
-
-  // Composer "branch off into a new worktree": open a fresh session anchored
-  // to the just-created tree, then prefill the task that kicked it off.
-  const startWorkSessionRequest = useStore($startWorkSessionRequest)
-  const lastStartWorkTokenRef = useRef(startWorkSessionRequest?.token ?? 0)
-
-  // eslint-disable-next-line no-restricted-syntax -- legitimate non-atom ref write (see eslint rule comment)
-  useEffect(() => {
-    if (!startWorkSessionRequest || startWorkSessionRequest.token === lastStartWorkTokenRef.current) {
-      return
-    }
-
-    lastStartWorkTokenRef.current = startWorkSessionRequest.token
-    startSessionInWorkspace(startWorkSessionRequest.path, { openTab: startWorkSessionRequest.openTab })
-
-    if (startWorkSessionRequest.draft) {
-      requestComposerInsert(startWorkSessionRequest.draft, { target: 'main' })
-    }
-  }, [startSessionInWorkspace, startWorkSessionRequest])
 
   const composer = useComposerActions({ activeSessionId, currentCwd, requestGateway })
 
@@ -847,6 +826,7 @@ export function ContribWiring({ children }: { children: ReactNode }) {
     onBranchInNewChat: messageId => void branchInNewChat(messageId),
     onBranchSession: sessionId => void branchStoredSession(sessionId),
     onCancel: cancelRun,
+    onChangeCwd: changeSessionCwd,
     onDeleteSelectedSession: () => {
       const id = $selectedStoredSessionId.get()
 
@@ -967,7 +947,7 @@ export function ContribWiring({ children }: { children: ReactNode }) {
   // Pane-registered tools (preview's monitor/devtools cluster) anchor flush
   // against the static system cluster — in the tree layout the titlebar band
   // sits ABOVE the grid, so AppShell's pane-width anchoring doesn't apply.
-  const SYSTEM_TOOL_COUNT = 4
+  const SYSTEM_TOOL_COUNT = 3
   const paneToolCount = rightTitlebarTools.filter(tool => !tool.hidden).length
   const systemToolsWidth = `calc(${SYSTEM_TOOL_COUNT} * (var(--titlebar-control-size) + 0.25rem))`
 

@@ -15,13 +15,6 @@ import { $pinnedSessionIds } from '@/store/layout'
 import { clearNotifications, notify, notifyError } from '@/store/notifications'
 import { $activeGatewayProfile, $newChatProfile, ensureGatewayProfile, normalizeProfileKey } from '@/store/profile'
 import {
-  beginSessionMutation,
-  endSessionMutation,
-  resolveNewSessionCwd,
-  tombstoneSessions,
-  untombstoneSessions
-} from '@/store/projects'
-import {
   $activeSessionStoredIdRotation,
   $currentCwd,
   $currentFastMode,
@@ -55,7 +48,8 @@ import {
   setSessionStartedAt,
   setTurnStartedAt,
   setWorkspaceCwdOwner,
-  setYoloActive
+  setYoloActive,
+  workspaceCwdForNewSession
 } from '@/store/session'
 import {
   $sessionTiles,
@@ -342,7 +336,7 @@ export function useSessionActions({
       if (!hasWorkspaceTarget) {
         // In a project → the repo's default-branch checkout; not in a project →
         // detached. So cmd-n does not inherit an unrelated linked worktree.
-        setCurrentCwd(resolveNewSessionCwd())
+        setCurrentCwd(workspaceCwdForNewSession())
       } else if (workspaceTarget === null) {
         setCurrentCwdTransient('')
       } else if (typeof workspaceTarget === 'string') {
@@ -379,7 +373,7 @@ export function useSessionActions({
             ? ''
             : typeof workspaceTarget === 'string'
               ? workspaceTarget.trim()
-              : $currentCwd.get().trim() || resolveNewSessionCwd()
+              : $currentCwd.get().trim() || workspaceCwdForNewSession()
 
         const params = await desktopSessionCreateParams(cwd)
         const created = await requestGateway<SessionCreateResponse>('session.create', params)
@@ -499,7 +493,7 @@ export function useSessionActions({
         // (focused session's project → project scope → default).
         // `null` is an intentional detached workspace; only an omitted cwd
         // should inherit the active project's shared folder.
-        const cwd = options?.cwd === undefined ? resolveNewSessionCwd() : (options.cwd ?? '')
+        const cwd = options?.cwd === undefined ? workspaceCwdForNewSession() : (options.cwd ?? '')
         const params = await desktopSessionCreateParams(cwd.trim())
         const created = await requestGateway<SessionCreateResponse>('session.create', params)
         const stored = created.stored_session_id
@@ -1350,15 +1344,8 @@ export function useSessionActions({
       // Pins are keyed on the durable lineage-root id; the stored id may be the
       // live tip after compression. Drop both so the pin can't linger.
       const removedPinId = removed ? sessionPinId(removed) : storedSessionId
-      const removedIds = [storedSessionId, removed?.id, removed?._lineage_root_id]
 
       setSessions(prev => prev.filter(session => !sessionMatchesStoredId(session, storedSessionId)))
-      // Evict from the project tree's optimistic layer too (the backend snapshot
-      // still lists it until its next refresh), so grouped + flat views drop the
-      // row in lockstep. Pin the tombstone against the projects.tree prune while
-      // the delete RPC is in flight, so a racing refresh can't flash it back.
-      tombstoneSessions(removedIds)
-      beginSessionMutation(removedIds)
       $pinnedSessionIds.set(previousPinned.filter(id => id !== storedSessionId && id !== removedPinId))
 
       // Tear down before awaiting so the route effect can't resume the
@@ -1395,7 +1382,6 @@ export function useSessionActions({
           setSessions(prev => [removed, ...prev])
         }
 
-        untombstoneSessions(removedIds)
         $pinnedSessionIds.set(previousPinned)
 
         if (wasSelected) {
@@ -1418,11 +1404,6 @@ export function useSessionActions({
         }
 
         notifyError(err, copy.deleteFailed)
-      } finally {
-        // Release the tombstone to the normal projects.tree prune now the RPC has
-        // settled (kept on success — the backend has deleted it; cleared on the
-        // rollback above on failure).
-        endSessionMutation(removedIds)
       }
     },
     [
@@ -1449,12 +1430,9 @@ export function useSessionActions({
       // Pins are keyed on the durable lineage-root id; the stored id may be the
       // live tip after compression. Drop both so the pin can't linger.
       const archivedPinId = archived ? sessionPinId(archived) : storedSessionId
-      const archivedIds = [storedSessionId, archived?.id, archived?._lineage_root_id]
 
       // Soft-hide: drop from the sidebar immediately, keep the data.
       setSessions(prev => prev.filter(session => !sessionMatchesStoredId(session, storedSessionId)))
-      tombstoneSessions(archivedIds)
-      beginSessionMutation(archivedIds)
       $pinnedSessionIds.set(previousPinned.filter(id => id !== storedSessionId && id !== archivedPinId))
 
       if (wasSelected) {
@@ -1479,11 +1457,8 @@ export function useSessionActions({
           setSessions(prev => [archived, ...prev.filter(session => !sessionMatchesStoredId(session, storedSessionId))])
         }
 
-        untombstoneSessions(archivedIds)
         $pinnedSessionIds.set(previousPinned)
         notifyError(err, copy.archiveFailed)
-      } finally {
-        endSessionMutation(archivedIds)
       }
     },
     [copy, runtimeIdByStoredSessionIdRef, selectedStoredSessionId, sessionStateByRuntimeIdRef, startFreshSessionDraft]

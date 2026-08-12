@@ -196,7 +196,6 @@ export function useMessageStream({
   const compactedTurnRef = useRef<Set<string>>(new Set())
   // Last session we applied a session.info cwd for — lets us tell an agent
   // relocating the SAME session (follow it) from a session switch (don't yank).
-  const lastCwdInfoSessionRef = useRef<null | string>(null)
 
   const flushQueuedDeltas = useCallback(
     (sessionId?: string) => {
@@ -756,7 +755,6 @@ export function useMessageStream({
     appendReasoningDelta,
     activeSessionIdRef,
     compactedTurnRef,
-    lastCwdInfoSessionRef,
     nativeSubagentSessionsRef,
     completeAssistantMessage,
     failAssistantMessage,

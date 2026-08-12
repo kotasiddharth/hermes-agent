@@ -1,11 +1,11 @@
 import type { MutableRefObject } from 'react'
 
-import { followActiveSessionCwd, resolveNewSessionCwd } from '@/store/projects'
 import {
   $newChatWorkspaceTargetGeneration,
   setCurrentBranch,
   setCurrentCwd,
-  setNewChatWorkspaceTarget
+  setNewChatWorkspaceTarget,
+  workspaceCwdForNewSession
 } from '@/store/session'
 
 interface WorkspaceSessionOptions {
@@ -19,16 +19,17 @@ interface WorkspaceSessionOptions {
 
 export function startWorkspaceSession({
   activeSessionIdRef,
-  followActiveSessionCwd: followCwd = followActiveSessionCwd,
+  followActiveSessionCwd: followCwd = () => undefined,
   onExplicitWorkspace,
   path,
   requestGateway,
   startFreshSessionDraft
 }: WorkspaceSessionOptions): void {
-  // A worktree lane carries its own path; a project trunk can be path-less, so
-  // fall back to the active project's root for that existing controller path.
+  // An explicit path comes from the file browser/workspace picker. Without one,
+  // use the same lightweight default as a plain new chat; project metadata is
+  // deliberately not consulted here.
   const explicitTarget = path?.trim()
-  const target = explicitTarget || resolveNewSessionCwd()
+  const target = explicitTarget || workspaceCwdForNewSession()
 
   startFreshSessionDraft(target ? { workspaceTarget: target } : undefined)
 

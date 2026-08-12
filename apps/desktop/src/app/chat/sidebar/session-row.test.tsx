@@ -135,6 +135,8 @@ describe('SidebarSessionRow', () => {
   })
 
   it('keeps enough vertical room for history titles and row actions to coexist', () => {
+    const title = 'A long previous conversation title'
+
     render(
       <SidebarSessionRow
         isPinned={false}
@@ -144,12 +146,16 @@ describe('SidebarSessionRow', () => {
         onDelete={noop}
         onPin={noop}
         onResume={noop}
-        session={makeSession({ title: 'A long previous conversation title' })}
+        session={makeSession({ title })}
       />
     )
 
-    const shell = screen.getByText('A long previous conversation title').closest('button')?.parentElement
+    const label = screen.getByText(title)
+    const shell = label.closest('button')?.parentElement
+
     expect(shell?.className).toContain('min-h-7')
+    expect(label.className).toContain('leading-4')
+    expect(label).toHaveAttribute('title', title)
   })
 
   it('does not render a handoff avatar for a locally-started session', () => {

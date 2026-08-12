@@ -63,7 +63,6 @@ import {
   $activeProjectId,
   $projects,
   $projectScope,
-  $projectSessionOwners,
   $projectTree,
   $projectTreeLoading,
   $removedSessionIds,
@@ -74,8 +73,6 @@ import {
   fetchProjectSessions,
   openProjectCreate,
   projectCwdForId,
-  refreshProjects,
-  refreshProjectTree,
   refreshWorktrees
 } from '@/store/projects'
 import { openRouteTile } from '@/store/route-tiles'
@@ -108,10 +105,8 @@ import { SidebarAccountMenu } from './account-menu'
 import { SidebarCronJobsSection } from './cron-jobs-section'
 import { SidebarLoadMoreRow } from './load-more-row'
 import { orderByIds, reconcileOrderIds, resolveManualSessionOrderIds, sameIds } from './order'
-import { ProjectDialog } from './project-dialog'
 import {
   excludeProjectSessions,
-  liveSessionProjectId,
   orderProjectsByIds,
   overlayLiveLanes,
   overlayLivePreviews,
@@ -126,7 +121,6 @@ import {
   StartWorkButton,
   useRepoWorktreeMap
 } from './projects'
-import { WorktreeDialog } from './projects/worktree-dialog'
 import { SidebarBlankState, SidebarSessionSkeletons } from './section-states'
 import { buildSessionByAnyId } from './session-index'
 import { SidebarSessionsSection } from './sessions-section'
@@ -137,12 +131,6 @@ import { CONTEXT_SPLIT_KIT, SplitSubmenu } from './split-submenu'
 // dominating the sidebar before the user asks to see it.
 const NON_SESSION_INITIAL_ROWS = 3
 const NON_SESSION_LOAD_STEP = 10
-
-// A focus transition commonly emits both `focus` and `visibilitychange`.
-// Coalesce those passive refreshes so opening a peer window does not pull the
-// same project snapshots twice. Explicit project mutations still refresh
-// immediately; this cooldown only applies to lifecycle notifications.
-const PASSIVE_PROJECT_REFRESH_COOLDOWN_MS = 1500
 
 const SIDEBAR_NAV: SidebarNavItem[] = [
   {
@@ -290,7 +278,6 @@ export function ChatSidebar({
   const projectOrderIds = useStore($sidebarProjectOrderIds)
   const projects = useStore($projects)
   const projectTree = useStore($projectTree)
-  const projectSessionOwners = useStore($projectSessionOwners)
   const projectTreeLoading = useStore($projectTreeLoading)
   const removedSessionIds = useStore($removedSessionIds)
   const reposScanning = useStore($reposScanning)
@@ -308,21 +295,6 @@ export function ChatSidebar({
   const messagingOpenIds = useStore($sidebarMessagingOpenIds)
   // Per-platform count of rows currently revealed (starts at NON_SESSION_INITIAL_ROWS).
   const [messagingVisible, setMessagingVisible] = useState<Record<string, number>>({})
-
-  const lastPassiveProjectRefreshAtRef = useRef(0)
-
-  const refreshPassiveProjectData = useCallback(() => {
-    const now = Date.now()
-
-    if (now - lastPassiveProjectRefreshAtRef.current < PASSIVE_PROJECT_REFRESH_COOLDOWN_MS) {
-      return
-    }
-
-    lastPassiveProjectRefreshAtRef.current = now
-
-    void refreshProjects()
-    void refreshProjectTree()
-  }, [])
 
   // Flash the ⌘N hint full-opacity (no transition) for the press, so hitting
   // the shortcut visibly pings its affordance in the sidebar.
@@ -452,61 +424,6 @@ export function ChatSidebar({
   // own slice ($messagingSessions) and rendered in self-managed per-platform
   // sections below, so there is no source-grouping magic to untangle here.
   //
-  // Projects are always shown above Recents. The `project -> repo -> lane ->
-  // sessions` tree is computed authoritatively on the backend; the sidebar only
-  // chooses which project rows to display and how to order them.
-  const worktreeGroupingActive = !showAllProfiles
-  const gatewayReady = gatewayState === 'open'
-
-  // The backend project tree is a structural snapshot, not a per-message feed.
-  // Refresh it on structural edges only. Live changes render through the
-  // in-memory overlay, and disk-wide repository discovery stays out of the
-  // sidebar's startup and focus paths.
-  useEffect(() => {
-    if (worktreeGroupingActive && gatewayReady) {
-      refreshPassiveProjectData()
-      // Paint the list from the fast tree fetch (explicit projects + repos from
-      // existing sessions / the backend cache) FIRST, then kick off the heavy
-      // home-dir git crawl so newly-discovered repos fold in afterward — instead
-      // of the crawl blocking the first render.
-    }
-  }, [gatewayReady, refreshPassiveProjectData, worktreeGroupingActive])
-
-  // Out-of-band project changes emit no git events, so re-pull the cheap tree
-  // snapshot on window focus / tab visibility. Agent-driven changes already
-  // refresh via $workspaceChangeTick.
-  useEffect(() => {
-    if (!worktreeGroupingActive || !gatewayReady) {
-      return
-    }
-
-    const onActive = () => {
-      if (document.visibilityState === 'hidden') {
-        return
-      }
-
-      refreshPassiveProjectData()
-    }
-
-    window.addEventListener('focus', onActive)
-    document.addEventListener('visibilitychange', onActive)
-
-    return () => {
-      window.removeEventListener('focus', onActive)
-      document.removeEventListener('visibilitychange', onActive)
-    }
-  }, [gatewayReady, refreshPassiveProjectData, worktreeGroupingActive])
-
-  // Apply the persisted repo + worktree orders to a project's repo subtrees.
-  const orderRepos = useCallback(
-    (repos: SidebarWorkspaceTree[]): SidebarWorkspaceTree[] =>
-      orderByIds(repos, parent => parent.id, workspaceParentOrderIds).map(parent => ({
-        ...parent,
-        groups: orderByIds(parent.groups, group => group.id, workspaceOrderIds)
-      })),
-    [workspaceParentOrderIds, workspaceOrderIds]
-  )
-
   // ── Projects: the single top-level model (authoritative, from the backend) ──
   // `projects.tree` already unifies explicit projects + auto repos and folds
   // linked worktrees under their main repo. The desktop only layers local view
@@ -891,25 +808,10 @@ export function ChatSidebar({
     sessionProfilesTruncated
   ])
 
-  // Recents excludes chats already represented by a visible project. If the
-  // backend cannot place a chat, it stays in Recents instead of disappearing.
-  const displayAgentSessions = useMemo(
-    () =>
-      agentSessions.filter(session => {
-        if (
-          visibleProjectIds.has(projectSessionOwners[session.id] ?? '') ||
-          (session._lineage_root_id != null &&
-            visibleProjectIds.has(projectSessionOwners[session._lineage_root_id] ?? ''))
-        ) {
-          return false
-        }
-
-        const projectId = liveSessionProjectId(session, projects)
-
-        return !projectId || !visibleProjectIds.has(projectId)
-      }),
-    [agentSessions, projectSessionOwners, projects, visibleProjectIds]
-  )
+  // The sidebar is a flat session history again. Workspace/project membership
+  // must never hide a chat from Recents; the right file sidebar is the place to
+  // browse the selected session's cwd.
+  const displayAgentSessions = agentSessions
 
   // Pagination is scope-aware. In "All profiles" mode it tracks the global
   // unified set; scoped to one profile it tracks that profile's own truncation
@@ -1000,7 +902,7 @@ export function ChatSidebar({
 
   const showSessionSkeletons = sessionsLoading && sortedSessions.length === 0
 
-  const showProjectsSection = worktreeGroupingActive
+  const showProjectsSection = false
 
   const showSessionSections =
     showSessionSkeletons || pinnedSessions.length > 0 || displayAgentSessions.length > 0 || showProjectsSection
@@ -1246,7 +1148,9 @@ export function ChatSidebar({
             <SidebarSessionsSection
               activeSessionId={activeSidebarSessionId}
               contentClassName={cn(
-                'sidebar-history-scroll flex min-h-0 flex-1 flex-col pb-1.75',
+                // Leave enough terminal space for the final row's line box to
+                // clear the scroll viewport edge in compact sidebars.
+                'sidebar-history-scroll flex min-h-0 flex-1 flex-col pb-3',
                 SCROLL_Y,
                 // Separate profile sections clearly in the ALL view; rows inside
                 // each group keep their own tight gap-px rhythm.
@@ -1358,12 +1262,9 @@ export function ChatSidebar({
           </div>
         )}
 
-        {!showSessionSections && <SidebarBlankState onNewProject={openProjectCreate} />}
+        {!showSessionSections && <SidebarBlankState onNewSession={() => onNavigate(SIDEBAR_NAV[0])} />}
       </SidebarContent>
       <SidebarAccountMenu />
-      <ProjectDialog />
-      {/* One mount for the whole app. The header of WorktreeDialog tells why. */}
-      <WorktreeDialog />
     </Sidebar>
   )
 }

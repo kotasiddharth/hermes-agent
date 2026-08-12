@@ -408,7 +408,7 @@ def format_aux_picker_entries(
 
 
 def _apply_capabilities(rows: list[dict]) -> None:
-    """Attach per-model option support, including exact reasoning levels.
+    """Attach a ``{model: {fast, reasoning}}`` map to each provider row.
 
     `fast` mirrors ``model_supports_fast_mode`` (the same gate the runtime
     enforces). `reasoning` comes from the models.dev catalog when known and
@@ -425,11 +425,10 @@ def _apply_capabilities(rows: list[dict]) -> None:
 
     for row in rows:
         slug = row.get("slug") or ""
-        caps: dict[str, dict] = {}
+        caps: dict[str, dict[str, bool]] = {}
 
         for model in row.get("models") or []:
             reasoning = True
-            meta = None
             if get_model_capabilities is not None and slug:
                 try:
                     meta = get_model_capabilities(slug, model)
@@ -438,15 +437,10 @@ def _apply_capabilities(rows: list[dict]) -> None:
                 except Exception:
                     reasoning = True
 
-            capability: dict[str, bool | list[str]] = {
+            caps[model] = {
                 "fast": bool(model_supports_fast_mode(model)),
                 "reasoning": reasoning,
             }
-            advertised_efforts = getattr(meta, "reasoning_efforts", None)
-            if advertised_efforts is not None:
-                capability["reasoning_efforts"] = list(advertised_efforts)
-
-            caps[model] = capability
 
         row["capabilities"] = caps
 

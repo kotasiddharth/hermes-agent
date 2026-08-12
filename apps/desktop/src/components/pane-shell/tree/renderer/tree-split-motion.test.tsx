@@ -86,4 +86,23 @@ describe('TreeSplit sidebar motion', () => {
     expect(track.style.flex).not.toBe('0 0 0px')
     expect(track.hasAttribute('inert')).toBe(false)
   })
+
+  it('keeps the workspace corner visibly inset from the navigation rail', () => {
+    const node = split(
+      'row',
+      [
+        group(['sessions-motion'], { active: 'sessions-motion', id: 'sessions-track' }),
+        group(['workspace-motion'], { active: 'workspace-motion', id: 'workspace-track' })
+      ],
+      [1, 1],
+      'workspace-corner-root'
+    )
+
+    const { container } = render(<TreeSplit node={node} root rootRow />)
+    const workspaceTrack = container.querySelector<HTMLElement>('[data-tree-track="workspace-track"]')!
+    const workspaceGroup = container.querySelector<HTMLElement>('[data-tree-group="workspace-track"]')!
+
+    expect(workspaceTrack.className).toContain('bg-(--ui-sidebar-surface-background)')
+    expect(workspaceGroup.className).toContain('rounded-tl-[var(--radius-3xl)]')
+  })
 })

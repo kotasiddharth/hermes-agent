@@ -20,7 +20,7 @@ export function SidebarSessionSkeletons() {
   )
 }
 
-export function SidebarBlankState({ onNewProject }: { onNewProject: () => void }) {
+export function SidebarBlankState({ onNewSession }: { onNewSession: () => void }) {
   const { t } = useI18n()
   const s = t.sidebar
 
@@ -29,9 +29,9 @@ export function SidebarBlankState({ onNewProject }: { onNewProject: () => void }
       <div className="flex flex-col items-center gap-2">
         <Codicon className="text-(--ui-text-quaternary)" name="root-folder" size="1.25rem" />
         <p className="text-xs text-(--ui-text-tertiary)">{s.noSessions}</p>
-        <Button className="mt-0.5 text-(--ui-text-secondary)" onClick={onNewProject} size="sm" variant="ghost">
+        <Button className="mt-0.5 text-(--ui-text-secondary)" onClick={onNewSession} size="sm" variant="ghost">
           <Codicon name="add" size="0.75rem" />
-          {s.projects.newButton}
+          {s.nav['new-session']}
         </Button>
       </div>
     </div>

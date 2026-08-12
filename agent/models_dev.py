@@ -578,10 +578,6 @@ class ModelCapabilities:
     supports_tools: bool = True
     supports_vision: bool = False
     supports_reasoning: bool = False
-    # ``None`` means models.dev did not report the model's named effort values.
-    # ``()`` means it explicitly offers native reasoning but only as a toggle
-    # or token-budget control, not a discrete effort menu.
-    reasoning_efforts: Optional[Tuple[str, ...]] = None
     context_window: int = 200000
     max_output_tokens: int = 8192
     model_family: str = ""
@@ -638,59 +634,13 @@ def _model_lookup_variants(model: str) -> Tuple[str, ...]:
     return (value,)
 
 
-_CANONICAL_REASONING_EFFORTS = frozenset({
-    "minimal",
-    "low",
-    "medium",
-    "high",
-    "xhigh",
-    "max",
-    "ultra",
-})
-
-
-def _extract_reasoning_efforts(reasoning_options: Any) -> Optional[Tuple[str, ...]]:
-    """Extract discrete effort values from models.dev's ``reasoning_options``.
-
-    The registry represents this as either one object or a list of controls.
-    Models with a ``toggle`` or ``budget_tokens`` control deliberately yield an
-    empty tuple: they can think, but Hermes must not invent a full effort
-    ladder for them. Unknown/malformed registry data returns ``None`` so
-    callers retain their backwards-compatible fallback behavior.
-    """
-    if reasoning_options is None:
-        return None
-
-    if isinstance(reasoning_options, dict):
-        options = [reasoning_options]
-    elif isinstance(reasoning_options, list):
-        options = reasoning_options
-    else:
-        return None
-
-    efforts: list[str] = []
-    for option in options:
-        if not isinstance(option, dict) or option.get("type") != "effort":
-            continue
-        values = option.get("values")
-        if not isinstance(values, list):
-            continue
-        for raw_value in values:
-            value = str(raw_value or "").strip().lower()
-            if value in _CANONICAL_REASONING_EFFORTS and value not in efforts:
-                efforts.append(value)
-
-    return tuple(efforts)
-
-
 def get_model_capabilities(provider: str, model: str) -> Optional[ModelCapabilities]:
     """Look up full capability metadata from models.dev cache.
 
     Uses the existing fetch_models_dev() and PROVIDER_TO_MODELS_DEV mapping.
     Returns None if model not found.
 
-    Extracts from model entry fields, including ``reasoning_options`` for the
-    model's exact named effort controls:
+    Extracts from model entry fields:
       - reasoning  (bool)  → supports_reasoning
       - tool_call  (bool)  → supports_tools
       - attachment (bool)  → supports_vision
@@ -738,7 +688,6 @@ def get_model_capabilities(provider: str, model: str) -> Optional[ModelCapabilit
     else:
         supports_vision = bool(entry.get("attachment", False))
     supports_reasoning = bool(entry.get("reasoning", False))
-    reasoning_efforts = _extract_reasoning_efforts(entry.get("reasoning_options"))
 
     # Extract limits
     limit = entry.get("limit", {})
@@ -757,7 +706,6 @@ def get_model_capabilities(provider: str, model: str) -> Optional[ModelCapabilit
         supports_tools=supports_tools,
         supports_vision=supports_vision,
         supports_reasoning=supports_reasoning,
-        reasoning_efforts=reasoning_efforts,
         context_window=context_window,
         max_output_tokens=max_output_tokens,
         model_family=model_family,

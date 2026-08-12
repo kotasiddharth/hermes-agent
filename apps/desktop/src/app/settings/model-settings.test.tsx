@@ -273,31 +273,6 @@ describe('ModelSettings', () => {
     )
   })
 
-  it("marks only the active model's advertised effort ceiling", async () => {
-    getGlobalModelOptions.mockResolvedValueOnce({
-      providers: [
-        {
-          name: 'Nous',
-          slug: 'nous',
-          models: ['hermes-4'],
-          authenticated: true,
-          capabilities: {
-            'hermes-4': { reasoning: true, fast: false, reasoning_efforts: ['low', 'medium', 'high'] }
-          }
-        }
-      ]
-    })
-
-    await renderModelSettings()
-    await waitFor(() => expect(getHermesConfigRecord).toHaveBeenCalled())
-
-    fireEvent.click(screen.getAllByRole('combobox').at(-1)!)
-
-    expect((await screen.findByRole('option', { name: 'High' })).getAttribute('data-highest-effort')).toBe('')
-    expect(screen.getByRole('option', { name: 'Low' }).getAttribute('data-highest-effort')).toBeNull()
-    expect(screen.getByRole('option', { name: 'Medium' }).getAttribute('data-highest-effort')).toBeNull()
-  })
-
   it('hides the reasoning/speed defaults when the main model reports no capabilities', async () => {
     getGlobalModelOptions.mockResolvedValueOnce({
       providers: [

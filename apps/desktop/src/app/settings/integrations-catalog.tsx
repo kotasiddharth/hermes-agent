@@ -144,7 +144,11 @@ export function IntegrationsCatalog({
 
   const googleWorkspaceQuery = useQuery({
     queryKey: ['google-workspace-status', normalizeProfileKey(activeProfile)],
-    queryFn: getGoogleWorkspaceStatus
+    queryFn: getGoogleWorkspaceStatus,
+    // A failed status probe should settle quickly and let the user retry or
+    // reconnect. Repeated retries made the action appear stuck for a minute.
+    retry: 1,
+    staleTime: 60_000
   })
 
   const entries = [...(catalogQuery.data?.entries ?? [])]
@@ -158,9 +162,10 @@ export function IntegrationsCatalog({
     matchesGoogleWorkspaceQuery(query, p.googleWorkspaceTitle, p.googleWorkspaceDescription) &&
     (onlyInstalled ? googleConnected : true)
 
-  // Saved OAuth state is profile-scoped. Do not offer a new connection until
-  // that profile's existing token has been checked.
-  const googleStatusPending = googleWorkspaceQuery.isError || googleWorkspaceQuery.isLoading
+  // Only an in-flight probe is pending. Errors must not be presented as a
+  // permanent loading state: users need a usable Connect/retry action when a
+  // backend is briefly unavailable or an older installation lacks this route.
+  const googleStatusPending = googleWorkspaceQuery.isLoading
 
   const googleActionLabel = connectingGoogle
     ? p.googleWorkspaceConnecting

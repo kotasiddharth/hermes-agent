@@ -175,6 +175,16 @@ describe('IntegrationsCatalog', () => {
     expect(screen.queryByRole('button', { name: 'Connect Google Workspace' })).toBeNull()
   })
 
+  it('does not trap the Google action in loading after a status probe fails', async () => {
+    getGoogleWorkspaceStatus.mockRejectedValue(new Error('status unavailable'))
+
+    await renderCatalog()
+
+    const connect = await screen.findByRole('button', { name: 'Connect Google Workspace' })
+    expect((connect as HTMLButtonElement).disabled).toBe(false)
+    expect(screen.queryByRole('button', { name: /Loading integrations.*Google Workspace/ })).toBeNull()
+  })
+
   it('waits for the saved Google connection state before offering Connect', async () => {
     getGoogleWorkspaceStatus.mockReturnValue(new Promise(() => undefined))
 

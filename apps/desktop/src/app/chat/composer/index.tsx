@@ -18,7 +18,6 @@ import { browseBackward, browseForward, deriveUserHistory, isBrowsingHistory } f
 import { POPOUT_WIDTH_REM } from '@/store/composer-popout'
 import { parkQueuedPrompts, removeQueuedPrompt, unparkQueuedPrompts } from '@/store/composer-queue'
 import { $activeGatewayProfile } from '@/store/profile'
-import { toggleReview } from '@/store/review'
 import { $gatewayState } from '@/store/session'
 import { $threadScrolledUp } from '@/store/thread-scroll'
 import { useTheme } from '@/themes'
@@ -39,7 +38,6 @@ import { COMPOSER_DROP_ACTIVE_CLASS, COMPOSER_DROP_FADE_CLASS } from './drop-aff
 import { markActiveComposer } from './focus'
 import { HelpHint } from './help-hint'
 import { useAtCompletions } from './hooks/use-at-completions'
-import { useComposerBranch } from './hooks/use-composer-branch'
 import { useComposerDraft } from './hooks/use-composer-draft'
 import { useComposerDrop } from './hooks/use-composer-drop'
 import { useComposerEscCancel } from './hooks/use-composer-esc-cancel'
@@ -70,7 +68,6 @@ import {
 } from './rich-editor'
 import { useComposerScope } from './scope'
 import { ComposerStatusStack } from './status-stack'
-import { CodingStatusRow } from './status-stack/coding-row'
 import { extractClipboardImageBlobs, openDirectiveScope } from './text-utils'
 import { ComposerTriggerPopover } from './trigger-popover'
 import type { ChatBarProps } from './types'
@@ -197,6 +194,7 @@ export function ChatBar({
   const { t } = useI18n()
   const gatewayState = useStore($gatewayState)
   const activeGatewayProfile = useStore($activeGatewayProfile)
+
   const reconnecting = gatewayState === 'closed' || gatewayState === 'error'
   const inputDisabled = disabled && !reconnecting
 
@@ -878,11 +876,6 @@ export function ChatBar({
     handleInputDrop
   } = useComposerDrop({ cwd, insertInlineRefs, onAttachDroppedItems, requestMainFocus })
 
-  // Branch / worktree hand-offs (CodingStatusRow). Owns the worktree open +
-  // branch-off/convert/list/switch actions; draft travels into the new session.
-  const { handleBranchOff, handleConvertBranch, handleListBranches, handleSwitchBranch, openInWorktree } =
-    useComposerBranch({ clearDraft, cwd, draftRef })
-
   // Global Esc-to-cancel when the chat (not the composer input) has focus.
   // Same explicit-halt semantics as the Stop button: park the queue.
   useComposerEscCancel({ awaitingInput, busy, onCancel: haltRun, target: scope.target })
@@ -960,7 +953,7 @@ export function ChatBar({
         autoCapitalize="off"
         autoCorrect="off"
         className={cn(
-          'min-h-[1.625rem] min-h-(--composer-input-min-height) max-h-(--composer-input-max-height) cursor-text overflow-y-auto whitespace-pre-wrap break-words [overflow-wrap:anywhere] bg-transparent pb-1 pr-1 pt-1 leading-normal text-foreground outline-none disabled:cursor-not-allowed',
+          'min-h-[1.625rem] min-h-(--composer-input-min-height) max-h-(--composer-input-max-height) cursor-text overflow-y-auto whitespace-pre-wrap break-words [overflow-wrap:anywhere] bg-transparent pb-1 pl-1.5 pr-1 pt-1 leading-normal text-foreground outline-none disabled:cursor-not-allowed',
           '**:data-ref-text:cursor-default',
           stacked ? 'w-full' : 'min-w-(--composer-input-inline-min-width) flex-1'
         )}
@@ -1125,15 +1118,6 @@ export function ChatBar({
               ) : null
             }
             sessionId={statusSessionId}
-          />
-          <CodingStatusRow
-            onBranchOff={handleBranchOff}
-            onConvertBranch={handleConvertBranch}
-            onListBranches={handleListBranches}
-            onOpen={() => toggleReview(scope.target === 'main' ? null : (cwd ?? null))}
-            onOpenWorktree={openInWorktree}
-            onSwitchBranch={handleSwitchBranch}
-            repoPath={cwd}
           />
           <ComposerPrimitive.Root
             className={cn(

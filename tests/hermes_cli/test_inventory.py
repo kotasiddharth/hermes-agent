@@ -131,46 +131,6 @@ def test_list_authenticated_providers_force_fresh_is_keyword_only():
     assert param.default is False
 
 
-def test_capabilities_forward_exact_model_reasoning_efforts():
-    """Desktop pickers must receive the model-level effort catalog, not just
-    a coarse reasoning boolean that expands into Hermes' entire ladder."""
-    from hermes_cli import inventory
-
-    class _Capabilities:
-        supports_reasoning = True
-        reasoning_efforts = ("low", "medium", "high")
-
-    rows = [{"slug": "tencent", "models": ["hy3"]}]
-    with (
-        patch("hermes_cli.models.model_supports_fast_mode", return_value=False),
-        patch("agent.models_dev.get_model_capabilities", return_value=_Capabilities()),
-    ):
-        inventory._apply_capabilities(rows)
-
-    assert rows[0]["capabilities"]["hy3"] == {
-        "fast": False,
-        "reasoning": True,
-        "reasoning_efforts": ["low", "medium", "high"],
-    }
-
-
-def test_capabilities_preserve_toggle_only_reasoning_without_fake_levels():
-    from hermes_cli import inventory
-
-    class _Capabilities:
-        supports_reasoning = True
-        reasoning_efforts = ()
-
-    rows = [{"slug": "zai", "models": ["glm-toggle"]}]
-    with (
-        patch("hermes_cli.models.model_supports_fast_mode", return_value=False),
-        patch("agent.models_dev.get_model_capabilities", return_value=_Capabilities()),
-    ):
-        inventory._apply_capabilities(rows)
-
-    assert rows[0]["capabilities"]["glm-toggle"]["reasoning_efforts"] == []
-
-
 def test_include_unconfigured_appends_canonical_skeletons():
     """include_unconfigured=True adds CANONICAL_PROVIDERS rows that
     list_authenticated_providers didn't emit. Skeleton rows have empty

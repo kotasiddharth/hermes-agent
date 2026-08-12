@@ -396,6 +396,36 @@ def get_nous_portal_account_info(
     )
 
 
+def get_nous_portal_identity() -> dict[str, Optional[str]]:
+    """Return the signed-in Portal identity safe to show in local UI.
+
+    The account endpoint is the only source of the user's email for Nous
+    device-code logins; the short-lived access JWT deliberately carries no PII.
+    This function intentionally projects just a display name and email rather
+    than returning the broader subscription/account payload.
+    """
+    info = get_nous_portal_account_info(force_fresh=True)
+    payload = info.raw_account if isinstance(info.raw_account, dict) else {}
+    raw_user = payload.get("user")
+    user = raw_user if isinstance(raw_user, dict) else {}
+    records = (user, payload)
+
+    return {
+        "display_name": _first_text(
+            records,
+            (
+                "display_name",
+                "displayName",
+                "full_name",
+                "fullName",
+                "name",
+                "username",
+            ),
+        ),
+        "email": _first_text(records, ("email", "email_address", "emailAddress")),
+    }
+
+
 def _fresh_account_info(
     *,
     state: dict[str, Any],
@@ -785,6 +815,16 @@ def _parse_iso_timestamp(value: Any) -> Optional[float]:
 def _coerce_str(value: Any) -> Optional[str]:
     if isinstance(value, str) and value:
         return value
+    return None
+
+
+def _first_text(records: tuple[dict[str, Any], ...], keys: tuple[str, ...]) -> Optional[str]:
+    """Return the first non-empty string from a small set of JSON records."""
+    for record in records:
+        for key in keys:
+            value = record.get(key)
+            if isinstance(value, str) and value.strip():
+                return value.strip()
     return None
 
 

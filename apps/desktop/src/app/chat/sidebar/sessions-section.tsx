@@ -56,7 +56,7 @@ function SidebarSectionHeader({
   const labelBody = (
     <>
       {icon}
-      <SidebarPanelLabel>{label}</SidebarPanelLabel>
+      <SidebarPanelLabel className="pl-0">{label}</SidebarPanelLabel>
       {meta && <SidebarSectionMeta>{meta}</SidebarSectionMeta>}
     </>
   )

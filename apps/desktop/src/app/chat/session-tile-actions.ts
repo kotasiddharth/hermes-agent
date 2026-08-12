@@ -21,7 +21,7 @@ import { triggerHaptic } from '@/lib/haptics'
 import { clearClarifyRequest } from '@/store/clarify'
 import type { ComposerAttachment } from '@/store/composer'
 import { resetSessionBackground } from '@/store/composer-status'
-import { notifyError } from '@/store/notifications'
+import { notify, notifyError } from '@/store/notifications'
 import { clearPreviewArtifacts } from '@/store/preview-status'
 import { clearAllPrompts } from '@/store/prompts'
 import { $connection, $sessions, sessionMatchesStoredId } from '@/store/session'
@@ -30,7 +30,7 @@ import { broadcastSessionsChanged } from '@/store/session-sync'
 import { clearSessionSubagents } from '@/store/subagents'
 import { clearSessionTodos } from '@/store/todos'
 import { setSessionDraftingTool } from '@/store/tool-drafting'
-import type { SessionInfo } from '@/types/hermes'
+import type { SessionInfo, SessionRuntimeInfo } from '@/types/hermes'
 
 import { uploadComposerAttachment } from '../session/hooks/use-prompt-actions'
 import {
@@ -200,7 +200,7 @@ export function useSessionTileActions({ runtimeId, scope, storedSessionId }: Ses
 
       return { attachments: synced, sessionId: liveSessionId }
     },
-    [requestGateway, scope.attachments]
+    [readState, requestGateway, scope.attachments]
   )
 
   // The REAL submit pipeline with tile seams: session always exists, and the
@@ -476,9 +476,52 @@ export function useSessionTileActions({ runtimeId, scope, storedSessionId }: Ses
     [update]
   )
 
+  // A tile owns a different runtime session than the primary chat. Re-anchor
+  // only its own state so changing a project directory in a split view never
+  // redirects the main conversation's tools.
+  const changeCwd = useCallback(
+    async (cwd: string) => {
+      const target = cwd.trim()
+
+      if (!target) {
+        return
+      }
+
+      try {
+        const info = await requestGateway<SessionRuntimeInfo>('session.cwd.set', {
+          cwd: target,
+          session_id: runtimeIdRef.current
+        })
+
+        update(state => ({ ...state, branch: info.branch || '', cwd: info.cwd || target }))
+        broadcastSessionsChanged()
+      } catch (err) {
+        const message = err instanceof Error ? err.message : String(err)
+
+        if (!message.includes('unknown method')) {
+          notifyError(err, copy.cwdChangeFailed)
+
+          return
+        }
+
+        // Older gateways cannot persist a tile-specific cwd. Keep the tile's
+        // draft workspace accurate for this window and make the staged state
+        // explicit, matching the primary-chat fallback.
+        update(state => ({ ...state, branch: '', cwd: target }))
+        notify({
+          kind: 'warning',
+          title: copy.cwdStagedTitle,
+          message: copy.cwdStagedMessage
+        })
+      }
+    },
+    [copy.cwdChangeFailed, copy.cwdStagedMessage, copy.cwdStagedTitle, requestGateway, update]
+  )
+
   return useMemo(
     () => ({
       cancelRun,
+      changeCwd,
       dismissError,
       editMessage,
       handleThreadMessagesChange,
@@ -489,6 +532,7 @@ export function useSessionTileActions({ runtimeId, scope, storedSessionId }: Ses
     }),
     [
       cancelRun,
+      changeCwd,
       dismissError,
       editMessage,
       handleThreadMessagesChange,

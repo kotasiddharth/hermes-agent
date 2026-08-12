@@ -95,6 +95,7 @@ contextBridge.exposeInMainWorld('hermesDesktop', {
   // (cloud-auto-discovery Phase 3).
   cloud: {
     status: () => ipcRenderer.invoke('hermes:cloud:status'),
+    account: () => ipcRenderer.invoke('hermes:cloud:account'),
     login: () => ipcRenderer.invoke('hermes:cloud:login'),
     logout: () => ipcRenderer.invoke('hermes:cloud:logout'),
     discover: org => ipcRenderer.invoke('hermes:cloud:discover', org),

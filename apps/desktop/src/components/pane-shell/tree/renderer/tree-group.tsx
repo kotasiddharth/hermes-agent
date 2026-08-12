@@ -357,7 +357,7 @@ export function TreeGroup({
         isSessionsRail
           ? 'm-0 rounded-none'
           : isWorkspaceGroup
-            ? 'm-0 rounded-tl-[var(--radius-xl)] border-l border-t border-(--ui-stroke-secondary)'
+            ? 'm-0 rounded-tl-[var(--radius-3xl)] border-l border-t border-(--ui-stroke-secondary)'
             : 'm-1.5 rounded-[var(--radius-xl)]'
       )}
       data-tree-group={node.id}

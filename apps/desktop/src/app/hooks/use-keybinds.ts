@@ -25,7 +25,6 @@ import {
 } from '@/store/find-in-page'
 import { $capture, $comboIndex, endCapture, setBinding } from '@/store/keybinds'
 import { setFileBrowserOpen, toggleFileBrowserOpen, togglePanesFlipped, toggleSidebarOpen } from '@/store/layout'
-import { openFolderAsProject } from '@/store/projects'
 import { toggleReview } from '@/store/review'
 import { $selectedStoredSessionId, setModelPickerOpen } from '@/store/session'
 import { reopenLastClosedTile } from '@/store/session-states'
@@ -177,7 +176,7 @@ export function useKeybinds(deps: KeybindRuntimeDeps): void {
     'workspace.newWorktree': () => void openWorktreeDialog(),
     // ⌘O: native folder picker → open the folder as a project (upsert) with a
     // fresh session anchored there.
-    'workspace.openFolder': () => void openFolderAsProject(),
+    'workspace.openFolder': toggleFileBrowserOpen,
 
     // Narrow-viewport reveal is handled inside the store toggles now.
     'view.toggleSidebar': toggleSidebarOpen,

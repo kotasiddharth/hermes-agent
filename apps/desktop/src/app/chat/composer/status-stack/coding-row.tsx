@@ -20,6 +20,7 @@ import { isDesktopFsRemoteMode } from '@/lib/desktop-fs'
 import { cn } from '@/lib/utils'
 import { openWorktreeDialog, registerRepoStatusCwd, repoStatusForCwd, repoWorktreesForCwd } from '@/store/coding-status'
 import { notifyError } from '@/store/notifications'
+import { $projects, $projectTree, projectIdForCwd } from '@/store/projects'
 
 // Tiny uppercase section header, matching the composer "+" menu's labels.
 const MENU_SECTION = 'text-[0.625rem] font-semibold uppercase tracking-wider text-(--ui-text-tertiary)'
@@ -34,6 +35,9 @@ const workspaceName = (path: string): string => {
 }
 
 interface CodingStatusRowProps {
+  /** A queued turn owns the space above the composer, so the directory strip
+   *  yields to the queue instead of creating a second competing card. */
+  hasQueuedPrompts?: boolean
   /** Branch the current draft off into a fresh worktree + session, based on
    *  `base` (a branch name; omitted = current HEAD). The composer owns the
    *  draft, so it supplies the orchestration; the row just collects the new
@@ -42,6 +46,8 @@ interface CodingStatusRowProps {
   /** Check an existing branch out into a fresh worktree + session (no new
    *  branch). Drives the dialog's "convert a branch" picker. */
   onConvertBranch?: (branch: string, path?: null | string, isDefault?: boolean) => Promise<void>
+  /** Pick and apply a new working directory for this chat. */
+  onChangeDirectory?: () => Promise<void> | void
   /** List the repo's local branches for the "convert a branch" picker. */
   onListBranches?: () => Promise<HermesGitBranch[]>
   /** Open the review pane (changed files + diffs). */
@@ -55,14 +61,14 @@ interface CodingStatusRowProps {
 }
 
 /**
- * The always-on coding-context row, the BASE of the composer status stack:
- * current branch, dirty summary (+/-), and ahead/behind. A touch more prominent
- * than the per-turn rows above it (larger branch label, accent glyph), and the
- * entry point to the review pane. Hidden when the active session isn't in a
- * local git repo (the probe returns null).
+ * Project coding context above the composer: current workspace, branch, dirty
+ * summary (+/-), and ahead/behind. It belongs only to chats in a project, and
+ * yields to queued work so the queue remains the one clear action surface.
  */
 export const CodingStatusRow = memo(function CodingStatusRow({
+  hasQueuedPrompts = false,
   onBranchOff,
+  onChangeDirectory,
   onConvertBranch,
   onListBranches,
   onOpen,
@@ -75,6 +81,20 @@ export const CodingStatusRow = memo(function CodingStatusRow({
   const p = t.sidebar.projects
   const fileMenu = t.fileMenu
   const resolvedRepoPath = repoPath?.trim() || undefined
+  // Project membership is driven by the backend-owned project tree, not by
+  // whether a cwd happens to be a Git repo. The tree also holds auto-projects
+  // for ordinary folders; the strip is reserved for named project folders that
+  // deliberately share one workspace across chats.
+  const projects = useStore($projects)
+  const projectTree = useStore($projectTree)
+  const projectId = resolvedRepoPath ? projectIdForCwd(resolvedRepoPath) : null
+  const projectNode = projectId ? projectTree.find(project => project.id === projectId) : undefined
+
+  const isProjectWorkspace = Boolean(
+    projectId &&
+    (projectNode ? !projectNode.isAuto && !projectNode.isNoProject : projects.some(project => project.id === projectId))
+  )
+
   const isRemoteWorkspace = isDesktopFsRemoteMode()
   // This surface's OWN worktree, always — never the primary's. The row used to
   // fall back to the global `$repoStatus` for a blank repoPath, which painted
@@ -84,10 +104,16 @@ export const CodingStatusRow = memo(function CodingStatusRow({
   const status = useStore(repoStatusForCwd(resolvedRepoPath))
   const worktrees = useStore(repoWorktreesForCwd(resolvedRepoPath))
 
-  // While mounted, keep this worktree in the coding-status refresh set so the
-  // turn-settle / tool-complete / focus edges re-probe it too (tiles otherwise
-  // only refreshed when the MAIN cwd probe happened to cover them).
-  useEffect(() => registerRepoStatusCwd(resolvedRepoPath), [resolvedRepoPath])
+  // Keep only a visible project rail in the refresh set. While queued work is
+  // using the slot, there is no branch UI to update; it re-registers and probes
+  // immediately when the queue clears.
+  useEffect(() => {
+    if (!resolvedRepoPath || !isProjectWorkspace || hasQueuedPrompts) {
+      return
+    }
+
+    return registerRepoStatusCwd(resolvedRepoPath)
+  }, [hasQueuedPrompts, isProjectWorkspace, resolvedRepoPath])
 
   const switchToBranch = async (branch: string) => {
     if (!onSwitchBranch) {
@@ -110,7 +136,7 @@ export const CodingStatusRow = memo(function CodingStatusRow({
     void openWorktreeDialog({ base, repoPath: resolvedRepoPath })
   }
 
-  if (!resolvedRepoPath) {
+  if (!resolvedRepoPath || !isProjectWorkspace || hasQueuedPrompts) {
     return null
   }
 
@@ -119,11 +145,28 @@ export const CodingStatusRow = memo(function CodingStatusRow({
 
   const workspaceMeta = (
     <>
-      <div className="group/workspace flex min-w-0 items-center gap-1.5">
-        <Codicon className="shrink-0 text-muted-foreground/85" name="folder" size="0.8rem" />
-        <span className="min-w-0 truncate text-xs font-medium text-foreground/92" title={resolvedRepoPath}>
-          {workspaceLabel}
-        </span>
+      <div className="group/workspace flex min-w-0 items-center gap-1.5" data-slot="project-directory">
+        {onChangeDirectory ? (
+          <button
+            aria-label={t.rightSidebar.changeCwdTitle}
+            className="-mx-1 flex min-w-0 items-center gap-1.5 rounded-md px-1 text-left outline-none transition-colors hover:bg-muted/60 hover:text-foreground focus-visible:bg-muted/60 focus-visible:ring-1 focus-visible:ring-ring/70"
+            onClick={() => void onChangeDirectory()}
+            title={t.rightSidebar.changeCwdTitle}
+            type="button"
+          >
+            <Codicon className="shrink-0 text-muted-foreground/85" name="folder" size="0.8rem" />
+            <span className="min-w-0 truncate text-xs font-medium text-foreground/92" title={resolvedRepoPath}>
+              {workspaceLabel}
+            </span>
+          </button>
+        ) : (
+          <>
+            <Codicon className="shrink-0 text-muted-foreground/85" name="folder" size="0.8rem" />
+            <span className="min-w-0 truncate text-xs font-medium text-foreground/92" title={resolvedRepoPath}>
+              {workspaceLabel}
+            </span>
+          </>
+        )}
         <CopyButton
           appearance="icon"
           buttonSize="icon-xs"
@@ -145,7 +188,13 @@ export const CodingStatusRow = memo(function CodingStatusRow({
 
   if (!status) {
     return (
-      <div className={cn(composerDockCard('full'), 'mx-2 mb-1.5 overflow-hidden')} data-slot="coding-status-card">
+      <div
+        className={cn(
+          composerDockCard('top'),
+          'mx-9 overflow-hidden rounded-b-none border-b border-b-transparent'
+        )}
+        data-slot="coding-status-card"
+      >
         <StatusRow
           // A project is a folder even when it is not a Git checkout. Keep its
           // workspace breadcrumb available rather than hiding all context.
@@ -240,11 +289,17 @@ export const CodingStatusRow = memo(function CodingStatusRow({
   }
 
   return (
-    <div className={cn(composerDockCard('full'), 'mx-2 mb-1.5 overflow-hidden')} data-slot="coding-status-card">
+    <div
+      className={cn(
+        composerDockCard('top'),
+        'mx-9 overflow-hidden rounded-b-none border-b border-b-transparent'
+      )}
+      data-slot="coding-status-card"
+    >
       <ActionsContextMenu contentClassName="w-60" disabled={!onBranchOff} items={renderBranchItems}>
         <StatusRow
-          // The workspace breadcrumb lives in its own quiet card above the
-          // composer, preserving the full input surface for drafting.
+          // The workspace breadcrumb is the composer's attached project rail;
+          // branch state shares the same compact row.
           className="coding-status-bar min-h-8 rounded-[inherit] px-3.5 py-1.5 hover:bg-transparent"
         >
           <div className="flex min-w-0 flex-1 items-center gap-2">

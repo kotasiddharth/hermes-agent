@@ -19,7 +19,6 @@ import { resolveVersionStatus } from '@/lib/version-status'
 import { copyFilePath, revealFile } from '@/store/file-actions'
 import { revealFileInTree } from '@/store/layout'
 import { $activeGatewayProfile } from '@/store/profile'
-import { $projectTree, projectNameForCwd } from '@/store/projects'
 import {
   $activeSessionId,
   $busy,
@@ -209,13 +208,6 @@ export function useStatusbarItems({
     (primaryFocused ? primaryCwd : '') ||
     ''
   ).trim()
-
-  // Derive the workspace's project name from the already-cached project tree
-  // (backend truth via projects.*), so the status item labels by project without
-  // a second per-session copy of the same fact. Re-derives whenever the cwd or
-  // the tree changes; null (no named project) falls back to the cwd leaf below.
-  const projectTree = useStore($projectTree)
-  const projectName = useMemo(() => projectNameForCwd(currentCwd), [currentCwd, projectTree])
 
   const sessionStartedAt = primaryFocused
     ? primarySessionStartedAt
@@ -417,10 +409,8 @@ export function useStatusbarItems({
         hidden: !currentCwd,
         icon: <FolderOpen className="size-3" />,
         id: 'workspace-cwd',
-        // Prefer the named project; fall back to the cwd leaf. Hover tip uses
-        // the shared display formatter (home → ~) so statusbar and branch bar
-        // agree on how a path looks.
-        label: projectName || (currentCwd ? pathLeaf(currentCwd) : undefined),
+        // Keep workspace identity grounded in the selected session's path.
+        label: currentCwd ? pathLeaf(currentCwd) : undefined,
         menuItems: currentCwd
           ? [
               {
@@ -506,7 +496,6 @@ export function useStatusbarItems({
       inferenceReady,
       inferenceStatus?.reason,
       openAgents,
-      projectName,
       subagentsFailed,
       subagentsRunning,
       toggleCommandCenter

@@ -34,7 +34,7 @@ export function ComposerApprovalMode({
           <Button
             aria-label={menu.ariaLabel}
             className={cn(
-              'h-7 gap-1 rounded-full px-2 py-0 text-[0.6875rem] font-medium text-(--ui-text-secondary)',
+              'h-7 gap-1 rounded-full px-2.5 py-0 text-[0.6875rem] font-medium text-(--ui-text-secondary) has-[>svg]:px-2.5',
               'hover:bg-(--chrome-action-hover) hover:text-foreground data-[state=open]:bg-(--chrome-action-hover) data-[state=open]:text-foreground'
             )}
             data-approval-mode={menu.mode}

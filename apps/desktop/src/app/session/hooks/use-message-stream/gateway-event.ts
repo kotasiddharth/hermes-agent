@@ -40,7 +40,6 @@ import { requestDesktopOnboarding, requestDesktopOnboardingForCredentialWarning 
 import { revealDesktopPane } from '@/store/pane-focus'
 import { flashPetActivity, markPetUnread, setPetActivity } from '@/store/pet'
 import { $activeGatewayProfile, normalizeProfileKey } from '@/store/profile'
-import { followActiveSessionCwd } from '@/store/projects'
 import { clearAllPrompts, setApprovalRequest, setSecretRequest, setSudoRequest } from '@/store/prompts'
 import { recordAgentReaction } from '@/store/reactions-local'
 import {
@@ -202,7 +201,6 @@ interface GatewayEventDeps {
   activeGatewayProfile: string
   activeSessionIdRef: MutableRefObject<string | null>
   compactedTurnRef: MutableRefObject<Set<string>>
-  lastCwdInfoSessionRef: MutableRefObject<string | null>
   nativeSubagentSessionsRef: MutableRefObject<Set<string>>
   appendAssistantDelta: (sessionId: string, delta: string) => void
   appendReasoningDelta: (sessionId: string, delta: string, replace?: boolean) => void
@@ -240,7 +238,6 @@ export function useGatewayEventHandler(deps: GatewayEventDeps) {
     activeGatewayProfile,
     activeSessionIdRef,
     compactedTurnRef,
-    lastCwdInfoSessionRef,
     nativeSubagentSessionsRef,
     completeAssistantMessage,
     failAssistantMessage,
@@ -441,10 +438,6 @@ export function useGatewayEventHandler(deps: GatewayEventDeps) {
             // moves, follow it — refresh the project tree + scope so the sidebar
             // tracks the live thread. A fresh selection (different session id)
             // is a switch, not a move, so it refreshes data without yanking scope.
-            const cwdMoved = payload.cwd !== $currentCwd.get()
-            const sameSession = !!sessionId && sessionId === lastCwdInfoSessionRef.current
-
-            lastCwdInfoSessionRef.current = sessionId
             setCurrentCwd(payload.cwd)
 
             // The backend just confirmed the selected conversation's real
@@ -455,9 +448,10 @@ export function useGatewayEventHandler(deps: GatewayEventDeps) {
             // backend has confirmed (#71254).
             setWorkspaceCwdOwner($selectedStoredSessionId.get())
 
-            if (cwdMoved && sameSession) {
-              void followActiveSessionCwd(payload.cwd)
-            }
+            // The selected session already owns this cwd in the local session
+            // store. Do not refresh project/repository metadata on every
+            // agent-driven directory change; the right file sidebar follows
+            // the cwd directly.
           }
 
           if (typeof payload?.branch === 'string') {
@@ -1271,7 +1265,6 @@ export function useGatewayEventHandler(deps: GatewayEventDeps) {
       failAssistantMessage,
       finalizeInterimAssistantMessage,
       flushQueuedDeltas,
-      lastCwdInfoSessionRef,
       nativeSubagentSessionsRef,
       queryClient,
       scheduleConfigRefresh,

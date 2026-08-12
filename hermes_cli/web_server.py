@@ -3637,6 +3637,20 @@ async def get_portal_status():
     }
 
 
+@app.get("/api/portal/identity")
+async def get_portal_identity(profile: Optional[str] = None):
+    """Return the active profile's safe Nous identity for the desktop UI."""
+    with _profile_scope(profile):
+        try:
+            from hermes_cli.nous_account import get_nous_portal_identity
+
+            return await asyncio.to_thread(get_nous_portal_identity)
+        except Exception:
+            # Identity presentation must never turn a valid provider login into
+            # a failed dashboard request. The renderer falls back gracefully.
+            return {"display_name": None, "email": None}
+
+
 # ---------------------------------------------------------------------------
 # Diagnostics: prompt-size, support dump, debug upload, config migrate.
 # All produce text output, so they spawn background actions tailed via

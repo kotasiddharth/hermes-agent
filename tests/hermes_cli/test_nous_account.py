@@ -14,6 +14,7 @@ from hermes_cli.nous_account import (
     NousPortalAccountInfo,
     format_nous_portal_entitlement_message,
     get_nous_portal_account_info,
+    get_nous_portal_identity,
     nous_portal_topup_url,
     reset_nous_portal_account_info_cache,
 )
@@ -170,6 +171,25 @@ def test_fresh_account_payload_normalization(monkeypatch, payload, expected_paid
     assert info.paid_service_access is expected_paid
     assert info.is_paid is expected_paid
     assert info.is_free_tier is (not expected_paid)
+
+
+def test_portal_identity_projects_only_safe_user_fields(monkeypatch):
+    token = _jwt({"sub": "user_123", "org_id": "org_123", "exp": int(time.time()) + 900})
+    payload = _account_payload(
+        allowed=True,
+        subscription=None,
+        subscription_credits=0,
+        purchased_credits=0,
+    )
+    payload["user"].update({"display_name": "Alice Example", "access_token": "never-return-this"})
+    monkeypatch.setattr("hermes_cli.auth.get_provider_auth_state", lambda provider: _state(token))
+    monkeypatch.setattr("hermes_cli.auth.resolve_nous_access_token", lambda: "fresh-token")
+    monkeypatch.setattr("hermes_cli.nous_account._fetch_nous_account_info", lambda *a, **kw: payload)
+
+    assert get_nous_portal_identity() == {
+        "display_name": "Alice Example",
+        "email": "alice@example.test",
+    }
 
 
 def test_no_oauth_token_reports_inference_key_present(monkeypatch):

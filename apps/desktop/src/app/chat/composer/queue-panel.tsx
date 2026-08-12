@@ -40,7 +40,11 @@ export function QueuePanel({
   }
 
   const nextEntry = entries.find(entry => entry.id !== editingId) ?? entries[0]
-  const queueLabel = parked ? c.queuedPaused(entries.length) : entries.length === 1 ? c.queueMessage : c.queued(entries.length)
+  const queueLabel = parked
+    ? c.queuedPaused(entries.length)
+    : entries.length === 1
+      ? c.queueMessage
+      : c.queued(entries.length)
   const primaryLabel = parked ? c.queueResume : busy ? c.queueSteer : c.queueSend
   const primaryTip = parked ? c.queueResumeTip : busy ? c.steer : c.queueSend
 
@@ -83,7 +87,11 @@ export function QueuePanel({
 
   return (
     <div className="flex min-h-8 items-center gap-2 px-3.5 py-1.5">
-      <Codicon className="shrink-0 text-muted-foreground/75" name={parked ? 'debug-pause' : 'list-selection'} size="0.8rem" />
+      <Codicon
+        className="shrink-0 text-muted-foreground/75"
+        name={parked ? 'debug-pause' : 'list-selection'}
+        size="0.8rem"
+      />
       <span className="min-w-0 flex-1 truncate text-xs font-medium text-foreground/92">{queueLabel}</span>
       <div className="flex shrink-0 items-center gap-0.5">
         <Tip label={primaryTip}>
@@ -112,7 +120,13 @@ export function QueuePanel({
             <Trash2 className={iconSize.xs} />
           </Button>
         </Tip>
-        <ActionsMenu align="end" ariaLabel={c.queueMoreActions} contentClassName="w-64" items={renderQueueItems} side="top">
+        <ActionsMenu
+          align="end"
+          ariaLabel={c.queueMoreActions}
+          contentClassName="w-64"
+          items={renderQueueItems}
+          side="top"
+        >
           <Button
             aria-label={c.queueMoreActions}
             className="size-5 rounded-md text-muted-foreground/75 hover:text-foreground"

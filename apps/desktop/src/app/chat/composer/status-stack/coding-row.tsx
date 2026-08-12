@@ -189,10 +189,7 @@ export const CodingStatusRow = memo(function CodingStatusRow({
   if (!status) {
     return (
       <div
-        className={cn(
-          composerDockCard('top'),
-          'mx-9 overflow-hidden rounded-b-none border-b border-b-transparent'
-        )}
+        className={cn(composerDockCard('top'), 'mx-9 overflow-hidden rounded-b-none border-b border-b-transparent')}
         data-slot="coding-status-card"
       >
         <StatusRow
@@ -290,10 +287,7 @@ export const CodingStatusRow = memo(function CodingStatusRow({
 
   return (
     <div
-      className={cn(
-        composerDockCard('top'),
-        'mx-9 overflow-hidden rounded-b-none border-b border-b-transparent'
-      )}
+      className={cn(composerDockCard('top'), 'mx-9 overflow-hidden rounded-b-none border-b border-b-transparent')}
       data-slot="coding-status-card"
     >
       <ActionsContextMenu contentClassName="w-60" disabled={!onBranchOff} items={renderBranchItems}>
